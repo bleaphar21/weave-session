@@ -1,0 +1,4267 @@
+{
+  "generatedAt": "2026-09-17T14:32:11.000Z",
+  "repo": "PostHog/posthog",
+  "window": {
+    "start": "2026-06-19T14:32:11.000Z",
+    "end": "2026-09-17T14:32:11.000Z",
+    "days": 90
+  },
+  "counts": {
+    "humanEngineers": 212,
+    "eligibleEngineers": 25,
+    "botAccountsExcluded": 14,
+    "botEventsExcluded": 104318,
+    "items": 19131,
+    "prs": 18076,
+    "issues": 1055,
+    "mergedPrs": 15229,
+    "events": 33412
+  },
+  "excludedLogins": [
+    "posthog-bot",
+    "copilot",
+    "trunk-io",
+    "coderabbitai",
+    "greptile-apps",
+    "github-actions[bot]",
+    "dependabot[bot]",
+    "renovate[bot]",
+    "hosthog",
+    "deployment-status-posthog",
+    "vercel[bot]",
+    "codecov[bot]",
+    "sentry-io[bot]",
+    "cursor"
+  ],
+  "methodology": {
+    "responsive": {
+      "key": "responsive",
+      "title": "Responsive Collaborator",
+      "summary": "Rewards engineers who reply fast, reply often, and whose feedback moves PRs to merge. In a repo shipping ~300 human PRs a day, a person who unblocks others quickly is the scarce resource.",
+      "formula": "impact = 0.40 × Responsiveness + 0.40 × Volume + 0.20 × Merge follow-through (each a percentile rank 0-100 among eligible engineers)",
+      "factors": [
+        {
+          "key": "responsiveness",
+          "label": "Responsiveness",
+          "weight": 0.4,
+          "metric": "Median reply latency in hours across the engineer's responses",
+          "direction": "lower_is_better"
+        },
+        {
+          "key": "volume",
+          "label": "Volume",
+          "weight": 0.4,
+          "metric": "Number of responses (issue comments, inline review comments, reviews)",
+          "direction": "higher_is_better"
+        },
+        {
+          "key": "followThrough",
+          "label": "Merge follow-through",
+          "weight": 0.2,
+          "metric": "Median hours from the engineer's last comment on a PR to that PR merging",
+          "direction": "lower_is_better"
+        }
+      ],
+      "definitions": [
+        "Response event: a human's issue comment, inline review comment, or review (APPROVED, CHANGES_REQUESTED, DISMISSED, or COMMENTED with a non-empty body) on a PR or issue. Empty COMMENTED reviews are dropped because they only wrap inline comments that are counted separately.",
+        "Trigger: for a response at time t on an item, the most recent human event on that item before t by someone other than the responder, or the item's creation if there is none. Bot events never count as triggers.",
+        "Reply latency = response time minus trigger time. Excluded when the previous human event on the item is by the same person (a follow-up, not a reply) or when the item predates the window with no in-window trigger. Volume still counts these.",
+        "Merge follow-through, per (engineer, merged PR) where the engineer is not the author: merged_at minus the engineer's last event before merge.",
+        "Human: GitHub user type is User and the login is not on the bot denylist (matches [bot], ends in bot, or is in the configurable list shown below).",
+        "Percentile rank: each factor is converted to 0-100 among eligible engineers. 92 on responsiveness means faster than 92% of eligible peers."
+      ],
+      "thresholds": [
+        "Eligible: at least 20 responses and at least 10 distinct PRs or issues in the window.",
+        "Window: 90 days ending at ingest time. Items count if created or updated in the window; only events created in the window are stored.",
+        "External contributors are included and labeled with their author association (MEMBER, CONTRIBUTOR, ...).",
+        "PRs authored are shown as context on each card but are not part of either score.",
+        "Merge follow-through needs at least 5 merged PRs the engineer commented on; otherwise it is dropped and the weights renormalize to 0.50 responsiveness / 0.50 volume, and the card says so.",
+        "Reply latency and follow-through deltas are capped at 14 days before taking the median."
+      ],
+      "limitations": [
+        "Latency is wall-clock, so weekends and time zones inflate it. The median blunts this but does not remove it.",
+        "First-response latency on a PR is measured from PR creation, not from 'ready for review' or a review request. Draft PRs are flagged and their creation-to-first-response latency is excluded.",
+        "Comments in Slack, pairing sessions and design docs are invisible to this data."
+      ]
+    },
+    "constructive": {
+      "key": "constructive",
+      "title": "Constructive Communicator",
+      "summary": "Rule-based scoring of each comment's substance, with no sentiment and no LLM. It asks one question: does this comment give the reader something to act on?",
+      "formula": "impact = 0.50 × Comment quality + 0.30 × Substantive volume + 0.20 × Breadth (each a percentile rank 0-100 among eligible engineers)",
+      "factors": [
+        {
+          "key": "quality",
+          "label": "Comment quality",
+          "weight": 0.5,
+          "metric": "Mean per-comment quality q (0-1) across the engineer's responses",
+          "direction": "higher_is_better"
+        },
+        {
+          "key": "substantiveVolume",
+          "label": "Substantive volume",
+          "weight": 0.3,
+          "metric": "log(1 + number of responses with q ≥ 0.4)",
+          "direction": "higher_is_better"
+        },
+        {
+          "key": "breadth",
+          "label": "Breadth",
+          "weight": 0.2,
+          "metric": "Distinct people whose PRs or issues the engineer responded on",
+          "direction": "higher_is_better"
+        }
+      ],
+      "definitions": [
+        "Per-comment quality q (0-1) adds points for: substance (0.30: 15+ words after stripping quotes and code = full, 5-14 words = half), code (0.20: a fenced code block or GitHub suggestion block), reference (0.15: a URL, #1234 reference, or file path / line reference), question (0.10: at least one '?'), actionable phrasing (0.15: should / could / consider / suggest / instead / what if / nit / let's / we can / try), rationale (0.10: because / since / so that / otherwise / leads to / this causes).",
+        "Ritual-only override: a body that is only lgtm / +1 / thanks / done / nice / emoji is forced to q = 0.",
+        "Response event: a human's issue comment, inline review comment, or review (APPROVED, CHANGES_REQUESTED, DISMISSED, or COMMENTED with a non-empty body) on a PR or issue. Empty COMMENTED reviews are dropped because they only wrap inline comments that are counted separately.",
+        "Trigger: for a response at time t on an item, the most recent human event on that item before t by someone other than the responder, or the item's creation if there is none. Bot events never count as triggers.",
+        "Human: GitHub user type is User and the login is not on the bot denylist (matches [bot], ends in bot, or is in the configurable list shown below).",
+        "Percentile rank: each factor is converted to 0-100 among eligible engineers. 92 on responsiveness means faster than 92% of eligible peers."
+      ],
+      "thresholds": [
+        "Eligible: at least 20 responses and at least 10 distinct PRs or issues in the window.",
+        "Window: 90 days ending at ingest time. Items count if created or updated in the window; only events created in the window are stored.",
+        "External contributors are included and labeled with their author association (MEMBER, CONTRIBUTOR, ...).",
+        "PRs authored are shown as context on each card but are not part of either score.",
+        "A response counts as substantive when q ≥ 0.4."
+      ],
+      "limitations": [
+        "Algorithm B rewards length and structure as proxies for substance. A long unhelpful comment scores well; a terse brilliant one scores poorly.",
+        "Latency is wall-clock, so weekends and time zones inflate it. The median blunts this but does not remove it.",
+        "First-response latency on a PR is measured from PR creation, not from 'ready for review' or a review request. Draft PRs are flagged and their creation-to-first-response latency is excluded.",
+        "Comments in Slack, pairing sessions and design docs are invisible to this data."
+      ]
+    }
+  },
+  "engineers": [
+    {
+      "login": "reviewer-anna",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-reviewer-anna?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 295,
+        "distinctItems": 117,
+        "distinctCounterparts": 38,
+        "medianReplyLatencyHours": 4.8,
+        "latencyN": 248,
+        "within24hPct": 92,
+        "medianFollowThroughHours": 36.8,
+        "followThroughN": 42,
+        "meanQuality": 0.64,
+        "substantiveResponses": 203,
+        "prsAuthored": 41
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 65,
+          "rank": 6,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 67,
+              "raw": 4.8,
+              "rawLabel": "Median reply 4.8h",
+              "explanation": "faster than 67% of eligible peers",
+              "n": 248,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 75,
+              "raw": 295,
+              "rawLabel": "295 responses across 117 PRs and issues",
+              "explanation": "more responses than 75% of eligible peers",
+              "n": 295,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 41,
+              "raw": 36.8,
+              "rawLabel": "Last comment lands median 36.8h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 41% of peers",
+              "n": 42,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 79.7,
+          "rank": 3,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 85,
+              "raw": 0.64,
+              "rawLabel": "Mean comment quality 0.64 of 1.00",
+              "explanation": "more actionable comments than 85% of eligible peers",
+              "n": 295,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 96,
+              "raw": 5.32,
+              "rawLabel": "203 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 96% of eligible peers",
+              "n": 203,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 42,
+              "raw": 38,
+              "rawLabel": "Helped 38 distinct people",
+              "explanation": "reached more people than 42% of eligible peers",
+              "n": 38,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32554#issuecomment-3273656011",
+            "itemNumber": 32554,
+            "itemTitle": "chore(deps): bump kea to 3.2",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-09-12T23:58:07.676Z",
+            "excerpt": "What happens if `snapshot_chunks` is empty? I think we'd throw on line 112 — consider guarding and emitting a `replay_missing_chunk` event so we can measure it.",
+            "latencyHours": 0.74
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33881#discussion_r2129969809",
+            "itemNumber": 33881,
+            "itemTitle": "feat(insights): add funnel step breakdown by cohort",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-02T09:44:43.181Z",
+            "excerpt": "Looks like the flake comes from the cache warm-up; the second run passes. I'd move the warm-up into the fixture so it's deterministic — see `ee/clickhouse/test/conftest.py:44`.",
+            "latencyHours": 1.16
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33025#pullrequestreview-3188892930",
+            "itemNumber": 33025,
+            "itemTitle": "fix(feature-flags): respect rollout percentage for anonymous users",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-07-23T19:20:41.524Z",
+            "excerpt": "I tried this locally with the demo data and the funnel step counts match the old query within 0.1%. Let's ship it, and I'll watch the CH query log for regressions.",
+            "latencyHours": 1.67
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32902#issuecomment-3272069601",
+            "itemNumber": 32902,
+            "itemTitle": "fix(retention): off-by-one in weekly buckets",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-06-30T13:03:27.730Z",
+            "excerpt": "The pagination cursor should be opaque; exposing the offset means clients can skip pages inconsistently when persons are deleted mid-scroll. Suggest base64 of `(created_at, id)` like `/events`. Because the ordering is stable, this also lets us add an index that covers the query.",
+            "quality": 1
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32109#discussion_r2119245810",
+            "itemNumber": 32109,
+            "itemTitle": "feat(notebooks): embed recordings inline",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-06T07:51:46.157Z",
+            "excerpt": "This will work, but since `toStartOfWeek` defaults to Sunday in ClickHouse and our UI assumes Monday, the first bucket is short by a day. Suggest:\n```suggestion\ntoStartOfWeek(timestamp, 1)\n```\nThat matches the trends query (#30122).",
+            "quality": 0.84
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32688#discussion_r2142955794",
+            "itemNumber": 32688,
+            "itemTitle": "feat(experiments): show credible intervals on results tab",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-06-27T22:03:16.856Z",
+            "excerpt": "Should we gate this behind the `hogql-insights-retention` flag first? If the new query is off by even a small percentage it leads to support tickets, and the flag lets us compare both paths in the query log for a week. Happy to pair on the comparison script.",
+            "quality": 0.75
+          }
+        ]
+      }
+    },
+    {
+      "login": "merge-marcus",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-merge-marcus?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 147,
+        "distinctItems": 65,
+        "distinctCounterparts": 31,
+        "medianReplyLatencyHours": 25.4,
+        "latencyN": 110,
+        "within24hPct": 64,
+        "medianFollowThroughHours": 48.1,
+        "followThroughN": 47,
+        "meanQuality": 0.68,
+        "substantiveResponses": 99,
+        "prsAuthored": 47
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 19.4,
+          "rank": 24,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 8,
+              "raw": 25.4,
+              "rawLabel": "Median reply 25.4h",
+              "explanation": "faster than 8% of eligible peers",
+              "n": 110,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 29,
+              "raw": 147,
+              "rawLabel": "147 responses across 65 PRs and issues",
+              "explanation": "more responses than 29% of eligible peers",
+              "n": 147,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 23,
+              "raw": 48.1,
+              "rawLabel": "Last comment lands median 2d before merge",
+              "explanation": "PRs merge sooner after their last comment than for 23% of peers",
+              "n": 47,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 74.7,
+          "rank": 4,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 100,
+              "raw": 0.68,
+              "rawLabel": "Mean comment quality 0.68 of 1.00",
+              "explanation": "more actionable comments than 100% of eligible peers",
+              "n": 147,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 63,
+              "raw": 4.61,
+              "rawLabel": "99 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 63% of eligible peers",
+              "n": 99,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 29,
+              "raw": 31,
+              "rawLabel": "Helped 31 distinct people",
+              "explanation": "reached more people than 29% of eligible peers",
+              "n": 31,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/issues/31954#issuecomment-3245016212",
+            "itemNumber": 31954,
+            "itemTitle": "Trends breakdown limit is silently capped at 25",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-21T21:41:47.137Z",
+            "excerpt": "The failing case is when `rollout_percentage` is 0 and the user is anonymous. Could we early-return false there instead of hashing? Otherwise this leads to a division in `_get_hash`.",
+            "latencyHours": 4.09
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31737#pullrequestreview-3107223282",
+            "itemNumber": 31737,
+            "itemTitle": "feat(surveys): allow multiple choice with 'other'",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-08-13T12:46:55.156Z",
+            "excerpt": "Approving. One follow-up: the retention buckets are week-aligned to Monday but the query uses `toStartOfWeek` with mode 0 (Sunday). See #31877 for the earlier discussion.",
+            "latencyHours": 14.21
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/31285#issuecomment-3279630254",
+            "itemNumber": 31285,
+            "itemTitle": "Feature flag payloads not returned by /decide v3",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-09-14T23:27:43.088Z",
+            "excerpt": "Nit: `getInsightUrl` already handles the short id, so we can drop the manual encode here. Otherwise LGTM, nice cleanup.",
+            "latencyHours": 17.53
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31889#discussion_r2171195731",
+            "itemNumber": 31889,
+            "itemTitle": "chore(deps): bump kea to 3.2",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-18T11:17:13.275Z",
+            "excerpt": "The root cause is that `person_id` is resolved after the override table is read, so overrides written in the same batch are missed. Two options: (1) read overrides in the same transaction, (2) re-order the steps. I'd suggest (2) because it avoids a lock — see `plugin-server/src/worker/ingestion/person-state.ts:210`. What do you think?",
+            "quality": 1
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31052#discussion_r2146216500",
+            "itemNumber": 31052,
+            "itemTitle": "fix(retention): off-by-one in weekly buckets",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-21T09:39:57.400Z",
+            "excerpt": "Nice — one thing: the `useEffect` runs on every filter change, so the tile refetches twice when both the date and breakdown change together. Consider debouncing via `useDebouncedCallback` from `lib/hooks`; we did the same in `trendsDataLogic` and it removed the double query.",
+            "quality": 0.96
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30644#discussion_r2145603832",
+            "itemNumber": 30644,
+            "itemTitle": "feat(experiments): show credible intervals on results tab",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-31T16:18:42.915Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 0.84
+          }
+        ]
+      }
+    },
+    {
+      "login": "unblock-uma",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-unblock-uma?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 223,
+        "distinctItems": 78,
+        "distinctCounterparts": 39,
+        "medianReplyLatencyHours": 34.3,
+        "latencyN": 185,
+        "within24hPct": 56,
+        "medianFollowThroughHours": 44.9,
+        "followThroughN": 55,
+        "meanQuality": 0.46,
+        "substantiveResponses": 86,
+        "prsAuthored": 11
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 25.4,
+          "rank": 22,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 4,
+              "raw": 34.3,
+              "rawLabel": "Median reply 34.3h",
+              "explanation": "faster than 4% of eligible peers",
+              "n": 185,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 46,
+              "raw": 223,
+              "rawLabel": "223 responses across 78 PRs and issues",
+              "explanation": "more responses than 46% of eligible peers",
+              "n": 223,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 27,
+              "raw": 44.9,
+              "rawLabel": "Last comment lands median 44.9h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 27% of peers",
+              "n": 55,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 52.4,
+          "rank": 12,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 54,
+              "raw": 0.46,
+              "rawLabel": "Mean comment quality 0.46 of 1.00",
+              "explanation": "more actionable comments than 54% of eligible peers",
+              "n": 223,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 54,
+              "raw": 4.47,
+              "rawLabel": "86 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 54% of eligible peers",
+              "n": 86,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 46,
+              "raw": 39,
+              "rawLabel": "Helped 39 distinct people",
+              "explanation": "reached more people than 46% of eligible peers",
+              "n": 39,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32741#issuecomment-3278609427",
+            "itemNumber": 32741,
+            "itemTitle": "chore(deps): bump kea to 3.2",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-24T01:19:01.415Z",
+            "excerpt": "Since the toolbar mounts before kea logic is ready, the selector returns undefined on first render. Wrapping in `useValues` after mount fixes it; I pushed a suggestion.",
+            "latencyHours": 5.31
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32883#issuecomment-3276583773",
+            "itemNumber": 32883,
+            "itemTitle": "feat(data-warehouse): support Postgres source schemas",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-19T19:34:31.179Z",
+            "excerpt": "Nit: `getInsightUrl` already handles the short id, so we can drop the manual encode here. Otherwise LGTM, nice cleanup.",
+            "latencyHours": 7.23
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30735#discussion_r2132983330",
+            "itemNumber": 30735,
+            "itemTitle": "fix(hogql): coerce nullable timestamps in joins",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-09T05:23:56.651Z",
+            "excerpt": "Could you add a test for the zero-usage invoice? We had a similar bug in #29904 and the fix regressed once already.",
+            "latencyHours": 18.53
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30920#discussion_r2146608408",
+            "itemNumber": 30920,
+            "itemTitle": "fix(retention): off-by-one in weekly buckets",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-24T21:50:38.774Z",
+            "excerpt": "Should we gate this behind the `hogql-insights-retention` flag first? If the new query is off by even a small percentage it leads to support tickets, and the flag lets us compare both paths in the query log for a week. Happy to pair on the comparison script.",
+            "quality": 0.69
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33734#discussion_r2139620657",
+            "itemNumber": 33734,
+            "itemTitle": "feat(error-tracking): group by fingerprint v2",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-06-29T19:24:17.619Z",
+            "excerpt": "Should we gate this behind the `hogql-insights-retention` flag first? If the new query is off by even a small percentage it leads to support tickets, and the flag lets us compare both paths in the query log for a week. Happy to pair on the comparison script.",
+            "quality": 0.62
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31289#discussion_r2138169967",
+            "itemNumber": 31289,
+            "itemTitle": "feat(insights): add funnel step breakdown by cohort",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-24T13:49:33.384Z",
+            "excerpt": "Tried this with the `demo` org: the survey renders but the 'other' free-text answer is dropped by `surveyResponseSchema`. You'll want to add `other_text` to the schema at `surveys/schema.ts:31`, and then the export needs a column for it too.",
+            "quality": 0.58
+          }
+        ]
+      }
+    },
+    {
+      "login": "triage-tomas",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-triage-tomas?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 322,
+        "distinctItems": 166,
+        "distinctCounterparts": 85,
+        "medianReplyLatencyHours": 1.4,
+        "latencyN": 270,
+        "within24hPct": 98,
+        "medianFollowThroughHours": 1.1,
+        "followThroughN": 25,
+        "meanQuality": 0.23,
+        "substantiveResponses": 62,
+        "prsAuthored": 24
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 87.4,
+          "rank": 2,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 92,
+              "raw": 1.4,
+              "rawLabel": "Median reply 1.4h",
+              "explanation": "faster than 92% of eligible peers",
+              "n": 270,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 79,
+              "raw": 322,
+              "rawLabel": "322 responses across 166 PRs and issues",
+              "explanation": "more responses than 79% of eligible peers",
+              "n": 322,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 95,
+              "raw": 1.1,
+              "rawLabel": "Last comment lands median 1.1h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 95% of peers",
+              "n": 25,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 34,
+          "rank": 20,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 13,
+              "raw": 0.23,
+              "rawLabel": "Mean comment quality 0.23 of 1.00",
+              "explanation": "more actionable comments than 13% of eligible peers",
+              "n": 322,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 33,
+              "raw": 4.14,
+              "rawLabel": "62 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 33% of eligible peers",
+              "n": 62,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 88,
+              "raw": 85,
+              "rawLabel": "Helped 85 distinct people",
+              "explanation": "reached more people than 88% of eligible peers",
+              "n": 85,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/issues/32475#issuecomment-3277942767",
+            "itemNumber": 32475,
+            "itemTitle": "Dashboard export ignores date range override",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-22T07:35:51.437Z",
+            "excerpt": "The failing case is when `rollout_percentage` is 0 and the user is anonymous. Could we early-return false there instead of hashing? Otherwise this leads to a division in `_get_hash`.",
+            "latencyHours": 0.26
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31991#pullrequestreview-3170790918",
+            "itemNumber": 31991,
+            "itemTitle": "fix(retention): off-by-one in weekly buckets",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-06-22T02:16:56.802Z",
+            "excerpt": "Since the toolbar mounts before kea logic is ready, the selector returns undefined on first render. Wrapping in `useValues` after mount fixes it; I pushed a suggestion.",
+            "latencyHours": 0.45
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33735#pullrequestreview-3138372987",
+            "itemNumber": 33735,
+            "itemTitle": "fix(dashboards): tile refresh race when filters change",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-08-05T18:52:00.704Z",
+            "excerpt": "The migration is fine but it runs on a 2B-row table; should we add `ALTER TABLE ... SETTINGS mutations_sync=0` and backfill async? Otherwise deploy blocks for ~40m.",
+            "latencyHours": 0.56
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32086#issuecomment-3246283872",
+            "itemNumber": 32086,
+            "itemTitle": "feat(error-tracking): group by fingerprint v2",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-30T18:25:19.721Z",
+            "excerpt": "The pagination cursor should be opaque; exposing the offset means clients can skip pages inconsistently when persons are deleted mid-scroll. Suggest base64 of `(created_at, id)` like `/events`. Because the ordering is stable, this also lets us add an index that covers the query.",
+            "quality": 0.54
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32648#discussion_r2120977424",
+            "itemNumber": 32648,
+            "itemTitle": "feat(web-analytics): channel type for paid social",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-14T22:27:37.947Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 0.47
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32852#discussion_r2109822452",
+            "itemNumber": 32852,
+            "itemTitle": "feat(experiments): show credible intervals on results tab",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-06-23T17:22:11.875Z",
+            "excerpt": "Nice — one thing: the `useEffect` runs on every filter change, so the tile refetches twice when both the date and breakdown change together. Consider debouncing via `useDebouncedCallback` from `lib/hooks`; we did the same in `trendsDataLogic` and it removed the double query.",
+            "quality": 0.35
+          }
+        ]
+      }
+    },
+    {
+      "login": "review-rin",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-review-rin?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 116,
+        "distinctItems": 56,
+        "distinctCounterparts": 26,
+        "medianReplyLatencyHours": 7.5,
+        "latencyN": 73,
+        "within24hPct": 87,
+        "medianFollowThroughHours": 24.7,
+        "followThroughN": 49,
+        "meanQuality": 0.54,
+        "substantiveResponses": 55,
+        "prsAuthored": 34
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 38.4,
+          "rank": 18,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 50,
+              "raw": 7.5,
+              "rawLabel": "Median reply 7.5h",
+              "explanation": "faster than 50% of eligible peers",
+              "n": 73,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 21,
+              "raw": 116,
+              "rawLabel": "116 responses across 56 PRs and issues",
+              "explanation": "more responses than 21% of eligible peers",
+              "n": 116,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 50,
+              "raw": 24.7,
+              "rawLabel": "Last comment lands median 24.7h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 50% of peers",
+              "n": 49,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 49.2,
+          "rank": 15,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 71,
+              "raw": 0.54,
+              "rawLabel": "Mean comment quality 0.54 of 1.00",
+              "explanation": "more actionable comments than 71% of eligible peers",
+              "n": 116,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 29,
+              "raw": 4.03,
+              "rawLabel": "55 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 29% of eligible peers",
+              "n": 55,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 25,
+              "raw": 26,
+              "rawLabel": "Helped 26 distinct people",
+              "explanation": "reached more people than 25% of eligible peers",
+              "n": 26,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33579#discussion_r2121353978",
+            "itemNumber": 33579,
+            "itemTitle": "fix(dashboards): tile refresh race when filters change",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-06-26T18:30:17.792Z",
+            "excerpt": "The migration is fine but it runs on a 2B-row table; should we add `ALTER TABLE ... SETTINGS mutations_sync=0` and backfill async? Otherwise deploy blocks for ~40m.",
+            "latencyHours": 1.27
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/31346#issuecomment-3254179185",
+            "itemNumber": 31346,
+            "itemTitle": "Session replay player freezes on tab switch",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-19T09:27:11.669Z",
+            "excerpt": "done — moved the cursor param into the serializer and added a test. Thanks for the pointer to the persons endpoint!",
+            "latencyHours": 1.48
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32569#issuecomment-3228199440",
+            "itemNumber": 32569,
+            "itemTitle": "feat(data-warehouse): support Postgres source schemas",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-27T15:01:32.513Z",
+            "excerpt": "Nit: `getInsightUrl` already handles the short id, so we can drop the manual encode here. Otherwise LGTM, nice cleanup.",
+            "latencyHours": 2.7
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31732#discussion_r2122674192",
+            "itemNumber": 31732,
+            "itemTitle": "fix(api): paginate /persons by cursor",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-23T22:41:14.807Z",
+            "excerpt": "The root cause is that `person_id` is resolved after the override table is read, so overrides written in the same batch are missed. Two options: (1) read overrides in the same transaction, (2) re-order the steps. I'd suggest (2) because it avoids a lock — see `plugin-server/src/worker/ingestion/person-state.ts:210`. What do you think?",
+            "quality": 0.91
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31586#discussion_r2154431447",
+            "itemNumber": 31586,
+            "itemTitle": "chore(deps): bump kea to 3.2",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-07T09:08:55.205Z",
+            "excerpt": "Should we gate this behind the `hogql-insights-retention` flag first? If the new query is off by even a small percentage it leads to support tickets, and the flag lets us compare both paths in the query log for a week. Happy to pair on the comparison script.",
+            "quality": 0.83
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30704#discussion_r2155342661",
+            "itemNumber": 30704,
+            "itemTitle": "fix(retention): off-by-one in weekly buckets",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-24T15:24:35.454Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 0.76
+          }
+        ]
+      }
+    },
+    {
+      "login": "helper-hana",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-helper-hana?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 331,
+        "distinctItems": 214,
+        "distinctCounterparts": 103,
+        "medianReplyLatencyHours": 2,
+        "latencyN": 188,
+        "within24hPct": 95,
+        "medianFollowThroughHours": 41.5,
+        "followThroughN": 9,
+        "meanQuality": 0.42,
+        "substantiveResponses": 112,
+        "prsAuthored": 50
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 76.4,
+          "rank": 4,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 85,
+              "raw": 2,
+              "rawLabel": "Median reply 2h",
+              "explanation": "faster than 85% of eligible peers",
+              "n": 188,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 88,
+              "raw": 331,
+              "rawLabel": "331 responses across 214 PRs and issues",
+              "explanation": "more responses than 88% of eligible peers",
+              "n": 331,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 36,
+              "raw": 41.5,
+              "rawLabel": "Last comment lands median 41.5h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 36% of peers",
+              "n": 9,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 66.9,
+          "rank": 7,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 48,
+              "raw": 0.42,
+              "rawLabel": "Mean comment quality 0.42 of 1.00",
+              "explanation": "more actionable comments than 48% of eligible peers",
+              "n": 331,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 79,
+              "raw": 4.73,
+              "rawLabel": "112 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 79% of eligible peers",
+              "n": 112,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 96,
+              "raw": 103,
+              "rawLabel": "Helped 103 distinct people",
+              "explanation": "reached more people than 96% of eligible peers",
+              "n": 103,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33429#pullrequestreview-3112849542",
+            "itemNumber": 33429,
+            "itemTitle": "fix(api): paginate /persons by cursor",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-09-14T14:17:51.154Z",
+            "excerpt": "Approving. One follow-up: the retention buckets are week-aligned to Monday but the query uses `toStartOfWeek` with mode 0 (Sunday). See #31877 for the earlier discussion.",
+            "latencyHours": 0.2
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31715#issuecomment-3256990990",
+            "itemNumber": 31715,
+            "itemTitle": "feat(experiments): show credible intervals on results tab",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-06-30T11:48:40.720Z",
+            "excerpt": "Approving. One follow-up: the retention buckets are week-aligned to Monday but the query uses `toStartOfWeek` with mode 0 (Sunday). See #31877 for the earlier discussion.",
+            "latencyHours": 0.6
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33138#issuecomment-3219965405",
+            "itemNumber": 33138,
+            "itemTitle": "feat(error-tracking): group by fingerprint v2",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-06-26T18:21:01.656Z",
+            "excerpt": "Since the toolbar mounts before kea logic is ready, the selector returns undefined on first render. Wrapping in `useValues` after mount fixes it; I pushed a suggestion.",
+            "latencyHours": 1.1
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33268#issuecomment-3200989525",
+            "itemNumber": 33268,
+            "itemTitle": "feat(insights): add funnel step breakdown by cohort",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-09-06T11:09:37.735Z",
+            "excerpt": "This will work, but since `toStartOfWeek` defaults to Sunday in ClickHouse and our UI assumes Monday, the first bucket is short by a day. Suggest:\n```suggestion\ntoStartOfWeek(timestamp, 1)\n```\nThat matches the trends query (#30122).",
+            "quality": 0.68
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33421#issuecomment-3225987614",
+            "itemNumber": 33421,
+            "itemTitle": "fix(hogql): coerce nullable timestamps in joins",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-19T06:30:24.089Z",
+            "excerpt": "Nice — one thing: the `useEffect` runs on every filter change, so the tile refetches twice when both the date and breakdown change together. Consider debouncing via `useDebouncedCallback` from `lib/hooks`; we did the same in `trendsDataLogic` and it removed the double query.",
+            "quality": 0.67
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33498#discussion_r2132619889",
+            "itemNumber": 33498,
+            "itemTitle": "chore(ci): split e2e jobs by product area",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-07T23:11:43.622Z",
+            "excerpt": "I don't think we can drop the `distinct_id` index yet because the `/decide` hot path still hits it (see `posthog/api/decide.py:88`). Could we instead add the composite index first, deploy, then remove the old one in a follow-up? Otherwise p99 on decide regresses.",
+            "quality": 0.63
+          }
+        ]
+      }
+    },
+    {
+      "login": "quick-quentin",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-quick-quentin?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 407,
+        "distinctItems": 207,
+        "distinctCounterparts": 77,
+        "medianReplyLatencyHours": 18.1,
+        "latencyN": 299,
+        "within24hPct": 70,
+        "medianFollowThroughHours": null,
+        "followThroughN": 3,
+        "meanQuality": 0.6,
+        "substantiveResponses": 251,
+        "prsAuthored": 28
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 58.5,
+          "rank": 8,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.5,
+              "percentile": 21,
+              "raw": 18.1,
+              "rawLabel": "Median reply 18.1h",
+              "explanation": "faster than 21% of eligible peers",
+              "n": 299,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.5,
+              "percentile": 96,
+              "raw": 407,
+              "rawLabel": "407 responses across 207 PRs and issues",
+              "explanation": "more responses than 96% of eligible peers",
+              "n": 407,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0,
+              "percentile": null,
+              "raw": null,
+              "rawLabel": "Only 3 merged PRs reviewed (need 5)",
+              "explanation": "not scored: too few merged PRs to measure",
+              "n": 3,
+              "direction": "lower_is_better"
+            }
+          ],
+          "note": "Merge follow-through not available (only 3 merged PRs, need 5); weights renormalized to 0.5 responsiveness / 0.5 volume."
+        },
+        "constructive": {
+          "composite": 85.3,
+          "rank": 2,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 79,
+              "raw": 0.6,
+              "rawLabel": "Mean comment quality 0.60 of 1.00",
+              "explanation": "more actionable comments than 79% of eligible peers",
+              "n": 407,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 100,
+              "raw": 5.53,
+              "rawLabel": "251 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 100% of eligible peers",
+              "n": 251,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 79,
+              "raw": 77,
+              "rawLabel": "Helped 77 distinct people",
+              "explanation": "reached more people than 79% of eligible peers",
+              "n": 77,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32917#discussion_r2130646280",
+            "itemNumber": 32917,
+            "itemTitle": "feat(error-tracking): group by fingerprint v2",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-23T16:02:11.047Z",
+            "excerpt": "What happens if `snapshot_chunks` is empty? I think we'd throw on line 112 — consider guarding and emitting a `replay_missing_chunk` event so we can measure it.",
+            "latencyHours": 2.08
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33863#pullrequestreview-3108812695",
+            "itemNumber": 33863,
+            "itemTitle": "fix(billing): handle zero-usage invoices",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-07-08T09:25:12.532Z",
+            "excerpt": "The failing case is when `rollout_percentage` is 0 and the user is anonymous. Could we early-return false there instead of hashing? Otherwise this leads to a division in `_get_hash`.",
+            "latencyHours": 5.43
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33590#discussion_r2169664967",
+            "itemNumber": 33590,
+            "itemTitle": "chore(ci): split e2e jobs by product area",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-16T07:15:38.034Z",
+            "excerpt": "The migration is fine but it runs on a 2B-row table; should we add `ALTER TABLE ... SETTINGS mutations_sync=0` and backfill async? Otherwise deploy blocks for ~40m.",
+            "latencyHours": 15.63
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31792#issuecomment-3205386274",
+            "itemNumber": 31792,
+            "itemTitle": "feat(error-tracking): group by fingerprint v2",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-13T08:53:00.337Z",
+            "excerpt": "Should we gate this behind the `hogql-insights-retention` flag first? If the new query is off by even a small percentage it leads to support tickets, and the flag lets us compare both paths in the query log for a week. Happy to pair on the comparison script.",
+            "quality": 0.92
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30790#discussion_r2169470177",
+            "itemNumber": 30790,
+            "itemTitle": "feat(surveys): allow multiple choice with 'other'",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-09T23:06:41.600Z",
+            "excerpt": "Should we gate this behind the `hogql-insights-retention` flag first? If the new query is off by even a small percentage it leads to support tickets, and the flag lets us compare both paths in the query log for a week. Happy to pair on the comparison script.",
+            "quality": 0.84
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32124#discussion_r2117214840",
+            "itemNumber": 32124,
+            "itemTitle": "fix(billing): handle zero-usage invoices",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-27T14:28:08.858Z",
+            "excerpt": "The pagination cursor should be opaque; exposing the offset means clients can skip pages inconsistently when persons are deleted mid-scroll. Suggest base64 of `(created_at, id)` like `/events`. Because the ordering is stable, this also lets us add an index that covers the query.",
+            "quality": 0.77
+          }
+        ]
+      }
+    },
+    {
+      "login": "fixer-farah",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-fixer-farah?v=4",
+      "association": "CONTRIBUTOR",
+      "eligible": true,
+      "raw": {
+        "responses": 231,
+        "distinctItems": 133,
+        "distinctCounterparts": 58,
+        "medianReplyLatencyHours": 22.6,
+        "latencyN": 171,
+        "within24hPct": 56,
+        "medianFollowThroughHours": 83.9,
+        "followThroughN": 68,
+        "meanQuality": 0.21,
+        "substantiveResponses": 52,
+        "prsAuthored": 12
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 30.2,
+          "rank": 21,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 17,
+              "raw": 22.6,
+              "rawLabel": "Median reply 22.6h",
+              "explanation": "faster than 17% of eligible peers",
+              "n": 171,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 54,
+              "raw": 231,
+              "rawLabel": "231 responses across 133 PRs and issues",
+              "explanation": "more responses than 54% of eligible peers",
+              "n": 231,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 9,
+              "raw": 83.9,
+              "rawLabel": "Last comment lands median 3.5d before merge",
+              "explanation": "PRs merge sooner after their last comment than for 9% of peers",
+              "n": 68,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 20.1,
+          "rank": 22,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 2,
+              "raw": 0.21,
+              "rawLabel": "Mean comment quality 0.21 of 1.00",
+              "explanation": "more actionable comments than 2% of eligible peers",
+              "n": 231,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 25,
+              "raw": 3.97,
+              "rawLabel": "52 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 25% of eligible peers",
+              "n": 52,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 58,
+              "raw": 58,
+              "rawLabel": "Helped 58 distinct people",
+              "explanation": "reached more people than 58% of eligible peers",
+              "n": 58,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33076#discussion_r2126297164",
+            "itemNumber": 33076,
+            "itemTitle": "perf(clickhouse): batch person lookups in trends query",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-26T11:27:00.747Z",
+            "excerpt": "Consider extracting the fingerprint normalisation into `error_tracking/fingerprint.py` so the ingestion plugin and the API share it. Right now they drift.",
+            "latencyHours": 4.25
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32519#pullrequestreview-3153721111",
+            "itemNumber": 32519,
+            "itemTitle": "feat(surveys): allow multiple choice with 'other'",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-09-09T14:58:25.624Z",
+            "excerpt": "The failing case is when `rollout_percentage` is 0 and the user is anonymous. Could we early-return false there instead of hashing? Otherwise this leads to a division in `_get_hash`.",
+            "latencyHours": 6.1
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/31712#issuecomment-3244039043",
+            "itemNumber": 31712,
+            "itemTitle": "Session replay player freezes on tab switch",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-09-06T00:23:20.427Z",
+            "excerpt": "What happens if `snapshot_chunks` is empty? I think we'd throw on line 112 — consider guarding and emitting a `replay_missing_chunk` event so we can measure it.",
+            "latencyHours": 9.02
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31109#discussion_r2170257777",
+            "itemNumber": 31109,
+            "itemTitle": "feat(hog): add array_distinct stdlib function",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-05T15:49:52.439Z",
+            "excerpt": "This will work, but since `toStartOfWeek` defaults to Sunday in ClickHouse and our UI assumes Monday, the first bucket is short by a day. Suggest:\n```suggestion\ntoStartOfWeek(timestamp, 1)\n```\nThat matches the trends query (#30122).",
+            "quality": 0.53
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33135#discussion_r2158509203",
+            "itemNumber": 33135,
+            "itemTitle": "perf(clickhouse): batch person lookups in trends query",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-29T21:56:11.910Z",
+            "excerpt": "Should we gate this behind the `hogql-insights-retention` flag first? If the new query is off by even a small percentage it leads to support tickets, and the flag lets us compare both paths in the query log for a week. Happy to pair on the comparison script.",
+            "quality": 0.53
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31751#discussion_r2110688106",
+            "itemNumber": 31751,
+            "itemTitle": "feat(notebooks): embed recordings inline",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-22T04:32:56.901Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 0.47
+          }
+        ]
+      }
+    },
+    {
+      "login": "ship-sasha",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-ship-sasha?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 412,
+        "distinctItems": 249,
+        "distinctCounterparts": 115,
+        "medianReplyLatencyHours": 0.7,
+        "latencyN": 257,
+        "within24hPct": 99,
+        "medianFollowThroughHours": 1.9,
+        "followThroughN": 57,
+        "meanQuality": 0.31,
+        "substantiveResponses": 109,
+        "prsAuthored": 37
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 98.2,
+          "rank": 1,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 100,
+              "raw": 0.7,
+              "rawLabel": "Median reply 42min",
+              "explanation": "faster than 100% of eligible peers",
+              "n": 257,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 100,
+              "raw": 412,
+              "rawLabel": "412 responses across 249 PRs and issues",
+              "explanation": "more responses than 100% of eligible peers",
+              "n": 412,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 91,
+              "raw": 1.9,
+              "rawLabel": "Last comment lands median 1.9h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 91% of peers",
+              "n": 57,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 51,
+          "rank": 14,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 17,
+              "raw": 0.31,
+              "rawLabel": "Mean comment quality 0.31 of 1.00",
+              "explanation": "more actionable comments than 17% of eligible peers",
+              "n": 412,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 75,
+              "raw": 4.7,
+              "rawLabel": "109 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 75% of eligible peers",
+              "n": 109,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 100,
+              "raw": 115,
+              "rawLabel": "Helped 115 distinct people",
+              "explanation": "reached more people than 100% of eligible peers",
+              "n": 115,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32907#issuecomment-3259931772",
+            "itemNumber": 32907,
+            "itemTitle": "feat(error-tracking): group by fingerprint v2",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-23T17:04:22.860Z",
+            "excerpt": "I tried this locally with the demo data and the funnel step counts match the old query within 0.1%. Let's ship it, and I'll watch the CH query log for regressions.",
+            "latencyHours": 0.11
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33414#pullrequestreview-3158384766",
+            "itemNumber": 33414,
+            "itemTitle": "fix(dashboards): tile refresh race when filters change",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-07-16T18:29:56.836Z",
+            "excerpt": "Nit: `getInsightUrl` already handles the short id, so we can drop the manual encode here. Otherwise LGTM, nice cleanup.",
+            "latencyHours": 0.27
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/32831#issuecomment-3214948963",
+            "itemNumber": 32831,
+            "itemTitle": "HogQL: LEFT JOIN on persons drops rows with null distinct_id",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-09-08T05:01:22.994Z",
+            "excerpt": "Approving. One follow-up: the retention buckets are week-aligned to Monday but the query uses `toStartOfWeek` with mode 0 (Sunday). See #31877 for the earlier discussion.",
+            "latencyHours": 0.38
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31048#discussion_r2168665751",
+            "itemNumber": 31048,
+            "itemTitle": "feat(data-warehouse): support Postgres source schemas",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-28T09:12:15.555Z",
+            "excerpt": "This will work, but since `toStartOfWeek` defaults to Sunday in ClickHouse and our UI assumes Monday, the first bucket is short by a day. Suggest:\n```suggestion\ntoStartOfWeek(timestamp, 1)\n```\nThat matches the trends query (#30122).",
+            "quality": 0.66
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31868#discussion_r2154175460",
+            "itemNumber": 31868,
+            "itemTitle": "feat(data-warehouse): support Postgres source schemas",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-09T22:53:46.997Z",
+            "excerpt": "This will work, but since `toStartOfWeek` defaults to Sunday in ClickHouse and our UI assumes Monday, the first bucket is short by a day. Suggest:\n```suggestion\ntoStartOfWeek(timestamp, 1)\n```\nThat matches the trends query (#30122).",
+            "quality": 0.52
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31009#issuecomment-3268565272",
+            "itemNumber": 31009,
+            "itemTitle": "fix(billing): handle zero-usage invoices",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-09-05T11:09:20.172Z",
+            "excerpt": "The pagination cursor should be opaque; exposing the offset means clients can skip pages inconsistently when persons are deleted mid-scroll. Suggest base64 of `(created_at, id)` like `/events`. Because the ordering is stable, this also lets us add an index that covers the query.",
+            "quality": 0.46
+          }
+        ]
+      }
+    },
+    {
+      "login": "nudge-nadia",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-nudge-nadia?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 42,
+        "distinctItems": 18,
+        "distinctCounterparts": 9,
+        "medianReplyLatencyHours": 1.2,
+        "latencyN": 35,
+        "within24hPct": 98,
+        "medianFollowThroughHours": 90.3,
+        "followThroughN": 28,
+        "meanQuality": 0.65,
+        "substantiveResponses": 26,
+        "prsAuthored": 7
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 41.6,
+          "rank": 16,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 96,
+              "raw": 1.2,
+              "rawLabel": "Median reply 1.2h",
+              "explanation": "faster than 96% of eligible peers",
+              "n": 35,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 8,
+              "raw": 42,
+              "rawLabel": "42 responses across 18 PRs and issues",
+              "explanation": "more responses than 8% of eligible peers",
+              "n": 42,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 0,
+              "raw": 90.3,
+              "rawLabel": "Last comment lands median 3.8d before merge",
+              "explanation": "PRs merge sooner after their last comment than for 0% of peers",
+              "n": 28,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 52.5,
+          "rank": 11,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 94,
+              "raw": 0.65,
+              "rawLabel": "Mean comment quality 0.65 of 1.00",
+              "explanation": "more actionable comments than 94% of eligible peers",
+              "n": 42,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 13,
+              "raw": 3.3,
+              "rawLabel": "26 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 13% of eligible peers",
+              "n": 26,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 8,
+              "raw": 9,
+              "rawLabel": "Helped 9 distinct people",
+              "explanation": "reached more people than 8% of eligible peers",
+              "n": 9,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/issues/31026#issuecomment-3228597273",
+            "itemNumber": 31026,
+            "itemTitle": "Trends breakdown limit is silently capped at 25",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-26T12:17:58.713Z",
+            "excerpt": "Since the toolbar mounts before kea logic is ready, the selector returns undefined on first render. Wrapping in `useValues` after mount fixes it; I pushed a suggestion.",
+            "latencyHours": 0.19
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32788#discussion_r2155425336",
+            "itemNumber": 32788,
+            "itemTitle": "feat(data-warehouse): support Postgres source schemas",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-05T08:57:03.081Z",
+            "excerpt": "Could you add a test for the zero-usage invoice? We had a similar bug in #29904 and the fix regressed once already.",
+            "latencyHours": 0.22
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31064#discussion_r2188935883",
+            "itemNumber": 31064,
+            "itemTitle": "feat(web-analytics): channel type for paid social",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-12T21:26:09.697Z",
+            "excerpt": "done — moved the cursor param into the serializer and added a test. Thanks for the pointer to the persons endpoint!",
+            "latencyHours": 0.63
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31186#issuecomment-3257971191",
+            "itemNumber": 31186,
+            "itemTitle": "feat(experiments): show credible intervals on results tab",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-28T22:02:27.441Z",
+            "excerpt": "The pagination cursor should be opaque; exposing the offset means clients can skip pages inconsistently when persons are deleted mid-scroll. Suggest base64 of `(created_at, id)` like `/events`. Because the ordering is stable, this also lets us add an index that covers the query.",
+            "quality": 0.94
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31046#discussion_r2121583726",
+            "itemNumber": 31046,
+            "itemTitle": "feat(hog): add array_distinct stdlib function",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-08T09:35:22.093Z",
+            "excerpt": "Tried this with the `demo` org: the survey renders but the 'other' free-text answer is dropped by `surveyResponseSchema`. You'll want to add `other_text` to the schema at `surveys/schema.ts:31`, and then the export needs a column for it too.",
+            "quality": 0.91
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31039#discussion_r2134832477",
+            "itemNumber": 31039,
+            "itemTitle": "chore(deps): bump kea to 3.2",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-09T20:27:02.249Z",
+            "excerpt": "Should we gate this behind the `hogql-insights-retention` flag first? If the new query is off by even a small percentage it leads to support tickets, and the flag lets us compare both paths in the query log for a week. Happy to pair on the comparison script.",
+            "quality": 0.89
+          }
+        ]
+      }
+    },
+    {
+      "login": "pair-pavel",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-pair-pavel?v=4",
+      "association": "COLLABORATOR",
+      "eligible": true,
+      "raw": {
+        "responses": 247,
+        "distinctItems": 130,
+        "distinctCounterparts": 75,
+        "medianReplyLatencyHours": 17.1,
+        "latencyN": 167,
+        "within24hPct": 73,
+        "medianFollowThroughHours": 59.3,
+        "followThroughN": 22,
+        "meanQuality": 0.32,
+        "substantiveResponses": 81,
+        "prsAuthored": 45
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 40.4,
+          "rank": 17,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 25,
+              "raw": 17.1,
+              "rawLabel": "Median reply 17.1h",
+              "explanation": "faster than 25% of eligible peers",
+              "n": 167,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 67,
+              "raw": 247,
+              "rawLabel": "247 responses across 130 PRs and issues",
+              "explanation": "more responses than 67% of eligible peers",
+              "n": 247,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 18,
+              "raw": 59.3,
+              "rawLabel": "Last comment lands median 2.5d before merge",
+              "explanation": "PRs merge sooner after their last comment than for 18% of peers",
+              "n": 22,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 42.5,
+          "rank": 16,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 25,
+              "raw": 0.32,
+              "rawLabel": "Mean comment quality 0.32 of 1.00",
+              "explanation": "more actionable comments than 25% of eligible peers",
+              "n": 247,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 50,
+              "raw": 4.41,
+              "rawLabel": "81 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 50% of eligible peers",
+              "n": 81,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 75,
+              "raw": 75,
+              "rawLabel": "Helped 75 distinct people",
+              "explanation": "reached more people than 75% of eligible peers",
+              "n": 75,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33049#issuecomment-3270562522",
+            "itemNumber": 33049,
+            "itemTitle": "chore(ci): split e2e jobs by product area",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-24T22:41:49.920Z",
+            "excerpt": "Consider extracting the fingerprint normalisation into `error_tracking/fingerprint.py` so the ingestion plugin and the API share it. Right now they drift.",
+            "latencyHours": 1.01
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32043#pullrequestreview-3130816077",
+            "itemNumber": 32043,
+            "itemTitle": "refactor(frontend): move toolbar to lemon components",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-08-29T07:24:36.218Z",
+            "excerpt": "The failing case is when `rollout_percentage` is 0 and the user is anonymous. Could we early-return false there instead of hashing? Otherwise this leads to a division in `_get_hash`.",
+            "latencyHours": 2.06
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32739#discussion_r2131414586",
+            "itemNumber": 32739,
+            "itemTitle": "fix(feature-flags): respect rollout percentage for anonymous users",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-23T10:13:19.454Z",
+            "excerpt": "This should be a `LEFT JOIN` because we still want persons without events in the window. Suggest:\n```sql\nLEFT JOIN person_distinct_id2 pdi ON ...\n```",
+            "latencyHours": 10.16
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32576#issuecomment-3258055089",
+            "itemNumber": 32576,
+            "itemTitle": "fix(api): paginate /persons by cursor",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-20T03:29:15.060Z",
+            "excerpt": "Nice — one thing: the `useEffect` runs on every filter change, so the tile refetches twice when both the date and breakdown change together. Consider debouncing via `useDebouncedCallback` from `lib/hooks`; we did the same in `trendsDataLogic` and it removed the double query.",
+            "quality": 0.53
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33372#discussion_r2132339328",
+            "itemNumber": 33372,
+            "itemTitle": "fix(dashboards): tile refresh race when filters change",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-01T11:14:01.160Z",
+            "excerpt": "Should we gate this behind the `hogql-insights-retention` flag first? If the new query is off by even a small percentage it leads to support tickets, and the flag lets us compare both paths in the query log for a week. Happy to pair on the comparison script.",
+            "quality": 0.5
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32423#discussion_r2126397800",
+            "itemNumber": 32423,
+            "itemTitle": "feat(experiments): show credible intervals on results tab",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-29T12:14:34.992Z",
+            "excerpt": "The pagination cursor should be opaque; exposing the offset means clients can skip pages inconsistently when persons are deleted mid-scroll. Suggest base64 of `(created_at, id)` like `/events`. Because the ordering is stable, this also lets us add an index that covers the query.",
+            "quality": 0.44
+          }
+        ]
+      }
+    },
+    {
+      "login": "comment-carla",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-comment-carla?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 172,
+        "distinctItems": 95,
+        "distinctCounterparts": 45,
+        "medianReplyLatencyHours": 5.4,
+        "latencyN": 109,
+        "within24hPct": 92,
+        "medianFollowThroughHours": 7.9,
+        "followThroughN": 19,
+        "meanQuality": 0.41,
+        "substantiveResponses": 67,
+        "prsAuthored": 35
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 55,
+          "rank": 10,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 63,
+              "raw": 5.4,
+              "rawLabel": "Median reply 5.4h",
+              "explanation": "faster than 63% of eligible peers",
+              "n": 109,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 38,
+              "raw": 172,
+              "rawLabel": "172 responses across 95 PRs and issues",
+              "explanation": "more responses than 38% of eligible peers",
+              "n": 172,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 73,
+              "raw": 7.9,
+              "rawLabel": "Last comment lands median 7.9h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 73% of peers",
+              "n": 19,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 42.4,
+          "rank": 17,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 42,
+              "raw": 0.41,
+              "rawLabel": "Mean comment quality 0.41 of 1.00",
+              "explanation": "more actionable comments than 42% of eligible peers",
+              "n": 172,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 38,
+              "raw": 4.22,
+              "rawLabel": "67 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 38% of eligible peers",
+              "n": 67,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 50,
+              "raw": 45,
+              "rawLabel": "Helped 45 distinct people",
+              "explanation": "reached more people than 50% of eligible peers",
+              "n": 45,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33743#pullrequestreview-3113518112",
+            "itemNumber": 33743,
+            "itemTitle": "fix(dashboards): tile refresh race when filters change",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-08-03T14:21:56.971Z",
+            "excerpt": "Since the toolbar mounts before kea logic is ready, the selector returns undefined on first render. Wrapping in `useValues` after mount fixes it; I pushed a suggestion.",
+            "latencyHours": 0.72
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31436#issuecomment-3276883893",
+            "itemNumber": 31436,
+            "itemTitle": "perf(clickhouse): batch person lookups in trends query",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-20T16:39:07.895Z",
+            "excerpt": "Approving. One follow-up: the retention buckets are week-aligned to Monday but the query uses `toStartOfWeek` with mode 0 (Sunday). See #31877 for the earlier discussion.",
+            "latencyHours": 2.86
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33471#discussion_r2183170159",
+            "itemNumber": 33471,
+            "itemTitle": "fix(hogql): coerce nullable timestamps in joins",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-09T13:43:42.531Z",
+            "excerpt": "The failing case is when `rollout_percentage` is 0 and the user is anonymous. Could we early-return false there instead of hashing? Otherwise this leads to a division in `_get_hash`.",
+            "latencyHours": 3.04
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30562#issuecomment-3242453323",
+            "itemNumber": 30562,
+            "itemTitle": "feat(error-tracking): group by fingerprint v2",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-06-27T11:28:35.135Z",
+            "excerpt": "I don't think we can drop the `distinct_id` index yet because the `/decide` hot path still hits it (see `posthog/api/decide.py:88`). Could we instead add the composite index first, deploy, then remove the old one in a follow-up? Otherwise p99 on decide regresses.",
+            "quality": 0.72
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31802#discussion_r2144875995",
+            "itemNumber": 31802,
+            "itemTitle": "fix(session-replay): recover from missing snapshot chunks",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-06T00:55:24.288Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 0.64
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32958#discussion_r2140051495",
+            "itemNumber": 32958,
+            "itemTitle": "fix(dashboards): tile refresh race when filters change",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-31T14:32:17.416Z",
+            "excerpt": "The root cause is that `person_id` is resolved after the override table is read, so overrides written in the same batch are missed. Two options: (1) read overrides in the same transaction, (2) re-order the steps. I'd suggest (2) because it avoids a lock — see `plugin-server/src/worker/ingestion/person-state.ts:210`. What do you think?",
+            "quality": 0.63
+          }
+        ]
+      }
+    },
+    {
+      "login": "ready-raj",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-ready-raj?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 28,
+        "distinctItems": 10,
+        "distinctCounterparts": 4,
+        "medianReplyLatencyHours": 10.8,
+        "latencyN": 17,
+        "within24hPct": 79,
+        "medianFollowThroughHours": 2.9,
+        "followThroughN": 85,
+        "meanQuality": 0.32,
+        "substantiveResponses": 8,
+        "prsAuthored": 6
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 31.6,
+          "rank": 20,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 38,
+              "raw": 10.8,
+              "rawLabel": "Median reply 10.8h",
+              "explanation": "faster than 38% of eligible peers",
+              "n": 17,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 0,
+              "raw": 28,
+              "rawLabel": "28 responses across 10 PRs and issues",
+              "explanation": "more responses than 0% of eligible peers",
+              "n": 28,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 82,
+              "raw": 2.9,
+              "rawLabel": "Last comment lands median 2.9h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 82% of peers",
+              "n": 85,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 13.1,
+          "rank": 24,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 25,
+              "raw": 0.32,
+              "rawLabel": "Mean comment quality 0.32 of 1.00",
+              "explanation": "more actionable comments than 25% of eligible peers",
+              "n": 28,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 2,
+              "raw": 2.2,
+              "rawLabel": "8 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 2% of eligible peers",
+              "n": 8,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 0,
+              "raw": 4,
+              "rawLabel": "Helped 4 distinct people",
+              "explanation": "reached more people than 0% of eligible peers",
+              "n": 4,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32823#pullrequestreview-3163451414",
+            "itemNumber": 32823,
+            "itemTitle": "feat(insights): add funnel step breakdown by cohort",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-08-23T21:23:03.223Z",
+            "excerpt": "The migration is fine but it runs on a 2B-row table; should we add `ALTER TABLE ... SETTINGS mutations_sync=0` and backfill async? Otherwise deploy blocks for ~40m.",
+            "latencyHours": 1.85
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/32269#issuecomment-3204964577",
+            "itemNumber": 32269,
+            "itemTitle": "Dashboard export ignores date range override",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-11T17:21:21.863Z",
+            "excerpt": "Consider extracting the fingerprint normalisation into `error_tracking/fingerprint.py` so the ingestion plugin and the API share it. Right now they drift.",
+            "latencyHours": 2.61
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32741#pullrequestreview-3137674640",
+            "itemNumber": 32741,
+            "itemTitle": "feat(notebooks): embed recordings inline",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-08-15T07:03:10.548Z",
+            "excerpt": "Nit: `getInsightUrl` already handles the short id, so we can drop the manual encode here. Otherwise LGTM, nice cleanup.",
+            "latencyHours": 5.81
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33181#issuecomment-3213067791",
+            "itemNumber": 33181,
+            "itemTitle": "fix(dashboards): tile refresh race when filters change",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-06-30T22:42:05.793Z",
+            "excerpt": "This will work, but since `toStartOfWeek` defaults to Sunday in ClickHouse and our UI assumes Monday, the first bucket is short by a day. Suggest:\n```suggestion\ntoStartOfWeek(timestamp, 1)\n```\nThat matches the trends query (#30122).",
+            "quality": 0.61
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31748#issuecomment-3257303206",
+            "itemNumber": 31748,
+            "itemTitle": "feat(experiments): show credible intervals on results tab",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-16T12:52:45.077Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 0.56
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31648#discussion_r2143547022",
+            "itemNumber": 31648,
+            "itemTitle": "feat(data-warehouse): support Postgres source schemas",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-06-28T07:24:34.061Z",
+            "excerpt": "The root cause is that `person_id` is resolved after the override table is read, so overrides written in the same batch are missed. Two options: (1) read overrides in the same transaction, (2) re-order the steps. I'd suggest (2) because it avoids a lock — see `plugin-server/src/worker/ingestion/person-state.ts:210`. What do you think?",
+            "quality": 0.44
+          }
+        ]
+      }
+    },
+    {
+      "login": "loop-lior",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-loop-lior?v=4",
+      "association": "CONTRIBUTOR",
+      "eligible": true,
+      "raw": {
+        "responses": 44,
+        "distinctItems": 23,
+        "distinctCounterparts": 10,
+        "medianReplyLatencyHours": 2,
+        "latencyN": 32,
+        "within24hPct": 97,
+        "medianFollowThroughHours": 29.1,
+        "followThroughN": 51,
+        "meanQuality": 0.21,
+        "substantiveResponses": 8,
+        "prsAuthored": 3
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 48.2,
+          "rank": 13,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 85,
+              "raw": 2,
+              "rawLabel": "Median reply 2h",
+              "explanation": "faster than 85% of eligible peers",
+              "n": 32,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 13,
+              "raw": 44,
+              "rawLabel": "44 responses across 23 PRs and issues",
+              "explanation": "more responses than 13% of eligible peers",
+              "n": 44,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 45,
+              "raw": 29.1,
+              "rawLabel": "Last comment lands median 29.1h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 45% of peers",
+              "n": 51,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 4.2,
+          "rank": 25,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 2,
+              "raw": 0.21,
+              "rawLabel": "Mean comment quality 0.21 of 1.00",
+              "explanation": "more actionable comments than 2% of eligible peers",
+              "n": 44,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 2,
+              "raw": 2.2,
+              "rawLabel": "8 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 2% of eligible peers",
+              "n": 8,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 13,
+              "raw": 10,
+              "rawLabel": "Helped 10 distinct people",
+              "explanation": "reached more people than 13% of eligible peers",
+              "n": 10,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32002#discussion_r2125424753",
+            "itemNumber": 32002,
+            "itemTitle": "feat(surveys): allow multiple choice with 'other'",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-18T01:57:19.137Z",
+            "excerpt": "done — moved the cursor param into the serializer and added a test. Thanks for the pointer to the persons endpoint!",
+            "latencyHours": 0.2
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32770#pullrequestreview-3151824299",
+            "itemNumber": 32770,
+            "itemTitle": "fix(ingestion): dedupe events with identical uuid across partitions",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-08-25T05:35:50.364Z",
+            "excerpt": "The migration is fine but it runs on a 2B-row table; should we add `ALTER TABLE ... SETTINGS mutations_sync=0` and backfill async? Otherwise deploy blocks for ~40m.",
+            "latencyHours": 0.35
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32976#pullrequestreview-3103869462",
+            "itemNumber": 32976,
+            "itemTitle": "feat(experiments): show credible intervals on results tab",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-07-29T16:17:24.676Z",
+            "excerpt": "What happens if `snapshot_chunks` is empty? I think we'd throw on line 112 — consider guarding and emitting a `replay_missing_chunk` event so we can measure it.",
+            "latencyHours": 0.47
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32247#discussion_r2178518260",
+            "itemNumber": 32247,
+            "itemTitle": "chore(ci): split e2e jobs by product area",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-18T11:51:11.695Z",
+            "excerpt": "Tried this with the `demo` org: the survey renders but the 'other' free-text answer is dropped by `surveyResponseSchema`. You'll want to add `other_text` to the schema at `surveys/schema.ts:31`, and then the export needs a column for it too.",
+            "quality": 0.52
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31988#discussion_r2179566661",
+            "itemNumber": 31988,
+            "itemTitle": "fix(hogql): coerce nullable timestamps in joins",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-19T12:59:54.135Z",
+            "excerpt": "I don't think we can drop the `distinct_id` index yet because the `/decide` hot path still hits it (see `posthog/api/decide.py:88`). Could we instead add the composite index first, deploy, then remove the old one in a follow-up? Otherwise p99 on decide regresses.",
+            "quality": 0.44
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33248#issuecomment-3211183224",
+            "itemNumber": 33248,
+            "itemTitle": "feat(insights): add funnel step breakdown by cohort",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-09-11T11:46:32.100Z",
+            "excerpt": "I don't think we can drop the `distinct_id` index yet because the `/decide` hot path still hits it (see `posthog/api/decide.py:88`). Could we instead add the composite index first, deploy, then remove the old one in a follow-up? Otherwise p99 on decide regresses.",
+            "quality": 0.36
+          }
+        ]
+      }
+    },
+    {
+      "login": "swift-sven",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-swift-sven?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 233,
+        "distinctItems": 102,
+        "distinctCounterparts": 59,
+        "medianReplyLatencyHours": 6.5,
+        "latencyN": 154,
+        "within24hPct": 88,
+        "medianFollowThroughHours": 17.9,
+        "followThroughN": 40,
+        "meanQuality": 0.32,
+        "substantiveResponses": 71,
+        "prsAuthored": 44
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 56.6,
+          "rank": 9,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 56,
+              "raw": 6.5,
+              "rawLabel": "Median reply 6.5h",
+              "explanation": "faster than 56% of eligible peers",
+              "n": 154,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 58,
+              "raw": 233,
+              "rawLabel": "233 responses across 102 PRs and issues",
+              "explanation": "more responses than 58% of eligible peers",
+              "n": 233,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 55,
+              "raw": 17.9,
+              "rawLabel": "Last comment lands median 17.9h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 55% of peers",
+              "n": 40,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 37.7,
+          "rank": 19,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 25,
+              "raw": 0.32,
+              "rawLabel": "Mean comment quality 0.32 of 1.00",
+              "explanation": "more actionable comments than 25% of eligible peers",
+              "n": 233,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 42,
+              "raw": 4.28,
+              "rawLabel": "71 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 42% of eligible peers",
+              "n": 71,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 63,
+              "raw": 59,
+              "rawLabel": "Helped 59 distinct people",
+              "explanation": "reached more people than 63% of eligible peers",
+              "n": 59,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33622#pullrequestreview-3184927627",
+            "itemNumber": 33622,
+            "itemTitle": "feat(experiments): show credible intervals on results tab",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-08-01T10:50:27.887Z",
+            "excerpt": "Looks like the flake comes from the cache warm-up; the second run passes. I'd move the warm-up into the fixture so it's deterministic — see `ee/clickhouse/test/conftest.py:44`.",
+            "latencyHours": 1.06
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33203#pullrequestreview-3150632235",
+            "itemNumber": 33203,
+            "itemTitle": "fix(retention): off-by-one in weekly buckets",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-07-18T03:18:04.986Z",
+            "excerpt": "Could you add a test for the zero-usage invoice? We had a similar bug in #29904 and the fix regressed once already.",
+            "latencyHours": 1.39
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30884#discussion_r2148491882",
+            "itemNumber": 30884,
+            "itemTitle": "fix(hogql): coerce nullable timestamps in joins",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-21T03:33:35.505Z",
+            "excerpt": "Consider extracting the fingerprint normalisation into `error_tracking/fingerprint.py` so the ingestion plugin and the API share it. Right now they drift.",
+            "latencyHours": 3.57
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31068#discussion_r2140412841",
+            "itemNumber": 31068,
+            "itemTitle": "feat(insights): add funnel step breakdown by cohort",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-08T12:15:43.946Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 0.54
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32793#discussion_r2142630393",
+            "itemNumber": 32793,
+            "itemTitle": "fix(billing): handle zero-usage invoices",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-05T07:13:34.732Z",
+            "excerpt": "The pagination cursor should be opaque; exposing the offset means clients can skip pages inconsistently when persons are deleted mid-scroll. Suggest base64 of `(created_at, id)` like `/events`. Because the ordering is stable, this also lets us add an index that covers the query.",
+            "quality": 0.5
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32334#discussion_r2114040612",
+            "itemNumber": 32334,
+            "itemTitle": "feat(experiments): show credible intervals on results tab",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-27T13:16:06.120Z",
+            "excerpt": "Tried this with the `demo` org: the survey renders but the 'other' free-text answer is dropped by `surveyResponseSchema`. You'll want to add `other_text` to the schema at `surveys/schema.ts:31`, and then the export needs a column for it too.",
+            "quality": 0.42
+          }
+        ]
+      }
+    },
+    {
+      "login": "steady-stella",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-steady-stella?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 403,
+        "distinctItems": 181,
+        "distinctCounterparts": 62,
+        "medianReplyLatencyHours": 2.1,
+        "latencyN": 334,
+        "within24hPct": 97,
+        "medianFollowThroughHours": 13.4,
+        "followThroughN": 19,
+        "meanQuality": 0.48,
+        "substantiveResponses": 187,
+        "prsAuthored": 18
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 80.2,
+          "rank": 3,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 79,
+              "raw": 2.1,
+              "rawLabel": "Median reply 2.1h",
+              "explanation": "faster than 79% of eligible peers",
+              "n": 334,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 92,
+              "raw": 403,
+              "rawLabel": "403 responses across 181 PRs and issues",
+              "explanation": "more responses than 92% of eligible peers",
+              "n": 403,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 59,
+              "raw": 13.4,
+              "rawLabel": "Last comment lands median 13.4h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 59% of peers",
+              "n": 19,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 72.5,
+          "rank": 6,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 63,
+              "raw": 0.48,
+              "rawLabel": "Mean comment quality 0.48 of 1.00",
+              "explanation": "more actionable comments than 63% of eligible peers",
+              "n": 403,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 92,
+              "raw": 5.24,
+              "rawLabel": "187 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 92% of eligible peers",
+              "n": 187,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 67,
+              "raw": 62,
+              "rawLabel": "Helped 62 distinct people",
+              "explanation": "reached more people than 67% of eligible peers",
+              "n": 62,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33566#discussion_r2162508822",
+            "itemNumber": 33566,
+            "itemTitle": "refactor(frontend): move toolbar to lemon components",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-06-21T20:30:12.315Z",
+            "excerpt": "Since the toolbar mounts before kea logic is ready, the selector returns undefined on first render. Wrapping in `useValues` after mount fixes it; I pushed a suggestion.",
+            "latencyHours": 0.52
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/30865#issuecomment-3247548935",
+            "itemNumber": 30865,
+            "itemTitle": "Dashboard export ignores date range override",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-20T03:59:02.341Z",
+            "excerpt": "I tried this locally with the demo data and the funnel step counts match the old query within 0.1%. Let's ship it, and I'll watch the CH query log for regressions.",
+            "latencyHours": 0.56
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/31022#issuecomment-3259574739",
+            "itemNumber": 31022,
+            "itemTitle": "Session replay player freezes on tab switch",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-09-05T19:51:37.608Z",
+            "excerpt": "Could you add a test for the zero-usage invoice? We had a similar bug in #29904 and the fix regressed once already.",
+            "latencyHours": 0.59
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32303#issuecomment-3211613661",
+            "itemNumber": 32303,
+            "itemTitle": "feat(data-warehouse): support Postgres source schemas",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-22T22:56:50.616Z",
+            "excerpt": "The root cause is that `person_id` is resolved after the override table is read, so overrides written in the same batch are missed. Two options: (1) read overrides in the same transaction, (2) re-order the steps. I'd suggest (2) because it avoids a lock — see `plugin-server/src/worker/ingestion/person-state.ts:210`. What do you think?",
+            "quality": 0.79
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32392#discussion_r2176858863",
+            "itemNumber": 32392,
+            "itemTitle": "fix(api): paginate /persons by cursor",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-09T18:14:18.916Z",
+            "excerpt": "I don't think we can drop the `distinct_id` index yet because the `/decide` hot path still hits it (see `posthog/api/decide.py:88`). Could we instead add the composite index first, deploy, then remove the old one in a follow-up? Otherwise p99 on decide regresses.",
+            "quality": 0.74
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31684#issuecomment-3207336043",
+            "itemNumber": 31684,
+            "itemTitle": "feat(experiments): show credible intervals on results tab",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-28T16:44:37.371Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 0.67
+          }
+        ]
+      }
+    },
+    {
+      "login": "detail-dev",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-detail-dev?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 227,
+        "distinctItems": 114,
+        "distinctCounterparts": 36,
+        "medianReplyLatencyHours": 6.5,
+        "latencyN": 178,
+        "within24hPct": 91,
+        "medianFollowThroughHours": 1,
+        "followThroughN": 58,
+        "meanQuality": 0.42,
+        "substantiveResponses": 101,
+        "prsAuthored": 46
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 62.4,
+          "rank": 7,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 56,
+              "raw": 6.5,
+              "rawLabel": "Median reply 6.5h",
+              "explanation": "faster than 56% of eligible peers",
+              "n": 178,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 50,
+              "raw": 227,
+              "rawLabel": "227 responses across 114 PRs and issues",
+              "explanation": "more responses than 50% of eligible peers",
+              "n": 227,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 100,
+              "raw": 1,
+              "rawLabel": "Last comment lands median 1h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 100% of peers",
+              "n": 58,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 51.1,
+          "rank": 13,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 48,
+              "raw": 0.42,
+              "rawLabel": "Mean comment quality 0.42 of 1.00",
+              "explanation": "more actionable comments than 48% of eligible peers",
+              "n": 227,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 67,
+              "raw": 4.62,
+              "rawLabel": "101 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 67% of eligible peers",
+              "n": 101,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 35,
+              "raw": 36,
+              "rawLabel": "Helped 36 distinct people",
+              "explanation": "reached more people than 35% of eligible peers",
+              "n": 36,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33678#discussion_r2123440399",
+            "itemNumber": 33678,
+            "itemTitle": "fix(dashboards): tile refresh race when filters change",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-09T20:47:11.357Z",
+            "excerpt": "I tried this locally with the demo data and the funnel step counts match the old query within 0.1%. Let's ship it, and I'll watch the CH query log for regressions.",
+            "latencyHours": 1.35
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32367#pullrequestreview-3119954997",
+            "itemNumber": 32367,
+            "itemTitle": "feat(web-analytics): channel type for paid social",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-09-03T01:42:38.933Z",
+            "excerpt": "I tried this locally with the demo data and the funnel step counts match the old query within 0.1%. Let's ship it, and I'll watch the CH query log for regressions.",
+            "latencyHours": 1.71
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30855#pullrequestreview-3176800261",
+            "itemNumber": 30855,
+            "itemTitle": "chore(ci): split e2e jobs by product area",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-07-02T12:10:28.729Z",
+            "excerpt": "What happens if `snapshot_chunks` is empty? I think we'd throw on line 112 — consider guarding and emitting a `replay_missing_chunk` event so we can measure it.",
+            "latencyHours": 2.87
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31019#discussion_r2130321960",
+            "itemNumber": 31019,
+            "itemTitle": "feat(notebooks): embed recordings inline",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-03T20:49:14.559Z",
+            "excerpt": "Nice — one thing: the `useEffect` runs on every filter change, so the tile refetches twice when both the date and breakdown change together. Consider debouncing via `useDebouncedCallback` from `lib/hooks`; we did the same in `trendsDataLogic` and it removed the double query.",
+            "quality": 0.7
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32823#discussion_r2127703242",
+            "itemNumber": 32823,
+            "itemTitle": "fix(feature-flags): respect rollout percentage for anonymous users",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-04T20:07:11.040Z",
+            "excerpt": "I don't think we can drop the `distinct_id` index yet because the `/decide` hot path still hits it (see `posthog/api/decide.py:88`). Could we instead add the composite index first, deploy, then remove the old one in a follow-up? Otherwise p99 on decide regresses.",
+            "quality": 0.67
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30757#issuecomment-3275305101",
+            "itemNumber": 30757,
+            "itemTitle": "fix(ingestion): dedupe events with identical uuid across partitions",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-09-12T13:44:32.550Z",
+            "excerpt": "Tried this with the `demo` org: the survey renders but the 'other' free-text answer is dropped by `surveyResponseSchema`. You'll want to add `other_text` to the schema at `surveys/schema.ts:31`, and then the export needs a column for it too.",
+            "quality": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "login": "patch-priya",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-patch-priya?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 330,
+        "distinctItems": 179,
+        "distinctCounterparts": 93,
+        "medianReplyLatencyHours": 23.8,
+        "latencyN": 183,
+        "within24hPct": 56,
+        "medianFollowThroughHours": null,
+        "followThroughN": 4,
+        "meanQuality": 0.35,
+        "substantiveResponses": 105,
+        "prsAuthored": 6
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 48,
+          "rank": 14,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.5,
+              "percentile": 13,
+              "raw": 23.8,
+              "rawLabel": "Median reply 23.8h",
+              "explanation": "faster than 13% of eligible peers",
+              "n": 183,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.5,
+              "percentile": 83,
+              "raw": 330,
+              "rawLabel": "330 responses across 179 PRs and issues",
+              "explanation": "more responses than 83% of eligible peers",
+              "n": 330,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0,
+              "percentile": null,
+              "raw": null,
+              "rawLabel": "Only 4 merged PRs reviewed (need 5)",
+              "explanation": "not scored: too few merged PRs to measure",
+              "n": 4,
+              "direction": "lower_is_better"
+            }
+          ],
+          "note": "Merge follow-through not available (only 4 merged PRs, need 5); weights renormalized to 0.5 responsiveness / 0.5 volume."
+        },
+        "constructive": {
+          "composite": 56.2,
+          "rank": 9,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 33,
+              "raw": 0.35,
+              "rawLabel": "Mean comment quality 0.35 of 1.00",
+              "explanation": "more actionable comments than 33% of eligible peers",
+              "n": 330,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 71,
+              "raw": 4.66,
+              "rawLabel": "105 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 71% of eligible peers",
+              "n": 105,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 92,
+              "raw": 93,
+              "rawLabel": "Helped 93 distinct people",
+              "explanation": "reached more people than 92% of eligible peers",
+              "n": 93,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32083#discussion_r2130651226",
+            "itemNumber": 32083,
+            "itemTitle": "chore(ci): split e2e jobs by product area",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-06-25T13:23:44.869Z",
+            "excerpt": "done — moved the cursor param into the serializer and added a test. Thanks for the pointer to the persons endpoint!",
+            "latencyHours": 5.69
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33849#issuecomment-3289917604",
+            "itemNumber": 33849,
+            "itemTitle": "feat(data-warehouse): support Postgres source schemas",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-21T19:50:40.809Z",
+            "excerpt": "Consider extracting the fingerprint normalisation into `error_tracking/fingerprint.py` so the ingestion plugin and the API share it. Right now they drift.",
+            "latencyHours": 9.33
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/33871#issuecomment-3288627893",
+            "itemNumber": 33871,
+            "itemTitle": "Session replay player freezes on tab switch",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-09T02:35:45.065Z",
+            "excerpt": "The migration is fine but it runs on a 2B-row table; should we add `ALTER TABLE ... SETTINGS mutations_sync=0` and backfill async? Otherwise deploy blocks for ~40m.",
+            "latencyHours": 14.14
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31250#discussion_r2152991505",
+            "itemNumber": 31250,
+            "itemTitle": "chore(ci): split e2e jobs by product area",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-30T05:54:27.139Z",
+            "excerpt": "This will work, but since `toStartOfWeek` defaults to Sunday in ClickHouse and our UI assumes Monday, the first bucket is short by a day. Suggest:\n```suggestion\ntoStartOfWeek(timestamp, 1)\n```\nThat matches the trends query (#30122).",
+            "quality": 0.66
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32651#issuecomment-3237709536",
+            "itemNumber": 32651,
+            "itemTitle": "chore(ci): split e2e jobs by product area",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-09T17:20:51.391Z",
+            "excerpt": "Tried this with the `demo` org: the survey renders but the 'other' free-text answer is dropped by `surveyResponseSchema`. You'll want to add `other_text` to the schema at `surveys/schema.ts:31`, and then the export needs a column for it too.",
+            "quality": 0.64
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31198#discussion_r2149394909",
+            "itemNumber": 31198,
+            "itemTitle": "fix(hogql): coerce nullable timestamps in joins",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-06-29T06:38:32.994Z",
+            "excerpt": "The pagination cursor should be opaque; exposing the offset means clients can skip pages inconsistently when persons are deleted mid-scroll. Suggest base64 of `(created_at, id)` like `/events`. Because the ordering is stable, this also lets us add an index that covers the query.",
+            "quality": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "login": "guide-gus",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-guide-gus?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 243,
+        "distinctItems": 135,
+        "distinctCounterparts": 72,
+        "medianReplyLatencyHours": 3.3,
+        "latencyN": 206,
+        "within24hPct": 95,
+        "medianFollowThroughHours": 3.7,
+        "followThroughN": 32,
+        "meanQuality": 0.53,
+        "substantiveResponses": 130,
+        "prsAuthored": 33
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 70.6,
+          "rank": 5,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 75,
+              "raw": 3.3,
+              "rawLabel": "Median reply 3.3h",
+              "explanation": "faster than 75% of eligible peers",
+              "n": 206,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 63,
+              "raw": 243,
+              "rawLabel": "243 responses across 135 PRs and issues",
+              "explanation": "more responses than 63% of eligible peers",
+              "n": 243,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 77,
+              "raw": 3.7,
+              "rawLabel": "Last comment lands median 3.7h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 77% of peers",
+              "n": 32,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 72.6,
+          "rank": 5,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 67,
+              "raw": 0.53,
+              "rawLabel": "Mean comment quality 0.53 of 1.00",
+              "explanation": "more actionable comments than 67% of eligible peers",
+              "n": 243,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 83,
+              "raw": 4.88,
+              "rawLabel": "130 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 83% of eligible peers",
+              "n": 130,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 71,
+              "raw": 72,
+              "rawLabel": "Helped 72 distinct people",
+              "explanation": "reached more people than 71% of eligible peers",
+              "n": 72,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/issues/32051#issuecomment-3283062753",
+            "itemNumber": 32051,
+            "itemTitle": "Session replay player freezes on tab switch",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-21T01:58:54.975Z",
+            "excerpt": "Looks like the flake comes from the cache warm-up; the second run passes. I'd move the warm-up into the fixture so it's deterministic — see `ee/clickhouse/test/conftest.py:44`.",
+            "latencyHours": 0.52
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/32897#issuecomment-3204897769",
+            "itemNumber": 32897,
+            "itemTitle": "Feature flag payloads not returned by /decide v3",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-23T02:18:37.399Z",
+            "excerpt": "Since the toolbar mounts before kea logic is ready, the selector returns undefined on first render. Wrapping in `useValues` after mount fixes it; I pushed a suggestion.",
+            "latencyHours": 0.92
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33633#issuecomment-3240396155",
+            "itemNumber": 33633,
+            "itemTitle": "fix(billing): handle zero-usage invoices",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-25T15:48:14.764Z",
+            "excerpt": "Nit: `getInsightUrl` already handles the short id, so we can drop the manual encode here. Otherwise LGTM, nice cleanup.",
+            "latencyHours": 0.98
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32050#discussion_r2184253660",
+            "itemNumber": 32050,
+            "itemTitle": "perf(clickhouse): batch person lookups in trends query",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-02T04:02:04.493Z",
+            "excerpt": "The pagination cursor should be opaque; exposing the offset means clients can skip pages inconsistently when persons are deleted mid-scroll. Suggest base64 of `(created_at, id)` like `/events`. Because the ordering is stable, this also lets us add an index that covers the query.",
+            "quality": 0.82
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32341#issuecomment-3282458284",
+            "itemNumber": 32341,
+            "itemTitle": "fix(billing): handle zero-usage invoices",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-06-29T02:05:34.426Z",
+            "excerpt": "Nice — one thing: the `useEffect` runs on every filter change, so the tile refetches twice when both the date and breakdown change together. Consider debouncing via `useDebouncedCallback` from `lib/hooks`; we did the same in `trendsDataLogic` and it removed the double query.",
+            "quality": 0.77
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30805#discussion_r2177043069",
+            "itemNumber": 30805,
+            "itemTitle": "fix(feature-flags): respect rollout percentage for anonymous users",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-25T05:37:01.303Z",
+            "excerpt": "Should we gate this behind the `hogql-insights-retention` flag first? If the new query is off by even a small percentage it leads to support tickets, and the flag lets us compare both paths in the query log for a week. Happy to pair on the comparison script.",
+            "quality": 0.66
+          }
+        ]
+      }
+    },
+    {
+      "login": "async-ayo",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-async-ayo?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 128,
+        "distinctItems": 47,
+        "distinctCounterparts": 16,
+        "medianReplyLatencyHours": 36,
+        "latencyN": 80,
+        "within24hPct": 37,
+        "medianFollowThroughHours": 8.7,
+        "followThroughN": 34,
+        "meanQuality": 0.22,
+        "substantiveResponses": 27,
+        "prsAuthored": 56
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 23.6,
+          "rank": 23,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 0,
+              "raw": 36,
+              "rawLabel": "Median reply 36h",
+              "explanation": "faster than 0% of eligible peers",
+              "n": 80,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 25,
+              "raw": 128,
+              "rawLabel": "128 responses across 47 PRs and issues",
+              "explanation": "more responses than 25% of eligible peers",
+              "n": 128,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 68,
+              "raw": 8.7,
+              "rawLabel": "Last comment lands median 8.7h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 68% of peers",
+              "n": 34,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 13.3,
+          "rank": 23,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 8,
+              "raw": 0.22,
+              "rawLabel": "Mean comment quality 0.22 of 1.00",
+              "explanation": "more actionable comments than 8% of eligible peers",
+              "n": 128,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 17,
+              "raw": 3.33,
+              "rawLabel": "27 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 17% of eligible peers",
+              "n": 27,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 21,
+              "raw": 16,
+              "rawLabel": "Helped 16 distinct people",
+              "explanation": "reached more people than 21% of eligible peers",
+              "n": 16,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33824#pullrequestreview-3169996092",
+            "itemNumber": 33824,
+            "itemTitle": "chore(ci): split e2e jobs by product area",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-06-22T18:05:56.670Z",
+            "excerpt": "This should be a `LEFT JOIN` because we still want persons without events in the window. Suggest:\n```sql\nLEFT JOIN person_distinct_id2 pdi ON ...\n```",
+            "latencyHours": 4.22
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32635#pullrequestreview-3163089601",
+            "itemNumber": 32635,
+            "itemTitle": "feat(data-warehouse): support Postgres source schemas",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-07-20T09:41:12.023Z",
+            "excerpt": "Consider extracting the fingerprint normalisation into `error_tracking/fingerprint.py` so the ingestion plugin and the API share it. Right now they drift.",
+            "latencyHours": 9.8
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/31513#issuecomment-3213090935",
+            "itemNumber": 31513,
+            "itemTitle": "Session replay player freezes on tab switch",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-09-15T03:35:26.839Z",
+            "excerpt": "This should be a `LEFT JOIN` because we still want persons without events in the window. Suggest:\n```sql\nLEFT JOIN person_distinct_id2 pdi ON ...\n```",
+            "latencyHours": 9.94
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30616#issuecomment-3215026558",
+            "itemNumber": 30616,
+            "itemTitle": "feat(insights): add funnel step breakdown by cohort",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-29T17:29:09.074Z",
+            "excerpt": "Tried this with the `demo` org: the survey renders but the 'other' free-text answer is dropped by `surveyResponseSchema`. You'll want to add `other_text` to the schema at `surveys/schema.ts:31`, and then the export needs a column for it too.",
+            "quality": 0.54
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33689#discussion_r2184524781",
+            "itemNumber": 33689,
+            "itemTitle": "fix(api): paginate /persons by cursor",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-02T05:43:51.292Z",
+            "excerpt": "The root cause is that `person_id` is resolved after the override table is read, so overrides written in the same batch are missed. Two options: (1) read overrides in the same transaction, (2) re-order the steps. I'd suggest (2) because it avoids a lock — see `plugin-server/src/worker/ingestion/person-state.ts:210`. What do you think?",
+            "quality": 0.48
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31068#issuecomment-3236653846",
+            "itemNumber": 31068,
+            "itemTitle": "feat(hog): add array_distinct stdlib function",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-18T03:19:09.611Z",
+            "excerpt": "The pagination cursor should be opaque; exposing the offset means clients can skip pages inconsistently when persons are deleted mid-scroll. Suggest base64 of `(created_at, id)` like `/events`. Because the ordering is stable, this also lets us add an index that covers the query.",
+            "quality": 0.39
+          }
+        ]
+      }
+    },
+    {
+      "login": "morning-mika",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-morning-mika?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 106,
+        "distinctItems": 42,
+        "distinctCounterparts": 13,
+        "medianReplyLatencyHours": 3.5,
+        "latencyN": 72,
+        "within24hPct": 96,
+        "medianFollowThroughHours": 12.3,
+        "followThroughN": 60,
+        "meanQuality": 0.37,
+        "substantiveResponses": 33,
+        "prsAuthored": 54
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 48,
+          "rank": 15,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 71,
+              "raw": 3.5,
+              "rawLabel": "Median reply 3.5h",
+              "explanation": "faster than 71% of eligible peers",
+              "n": 72,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 17,
+              "raw": 106,
+              "rawLabel": "106 responses across 42 PRs and issues",
+              "explanation": "more responses than 17% of eligible peers",
+              "n": 106,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 64,
+              "raw": 12.3,
+              "rawLabel": "Last comment lands median 12.3h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 64% of peers",
+              "n": 60,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 28.7,
+          "rank": 21,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 38,
+              "raw": 0.37,
+              "rawLabel": "Mean comment quality 0.37 of 1.00",
+              "explanation": "more actionable comments than 38% of eligible peers",
+              "n": 106,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 21,
+              "raw": 3.53,
+              "rawLabel": "33 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 21% of eligible peers",
+              "n": 33,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 17,
+              "raw": 13,
+              "rawLabel": "Helped 13 distinct people",
+              "explanation": "reached more people than 17% of eligible peers",
+              "n": 13,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33599#issuecomment-3245701789",
+            "itemNumber": 33599,
+            "itemTitle": "fix(session-replay): recover from missing snapshot chunks",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-06-24T21:48:06.289Z",
+            "excerpt": "Nit: `getInsightUrl` already handles the short id, so we can drop the manual encode here. Otherwise LGTM, nice cleanup.",
+            "latencyHours": 0.65
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32977#issuecomment-3250629888",
+            "itemNumber": 32977,
+            "itemTitle": "chore(deps): bump kea to 3.2",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-06-24T13:03:33.434Z",
+            "excerpt": "done — moved the cursor param into the serializer and added a test. Thanks for the pointer to the persons endpoint!",
+            "latencyHours": 1.64
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33043#pullrequestreview-3157306705",
+            "itemNumber": 33043,
+            "itemTitle": "feat(error-tracking): group by fingerprint v2",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-09-08T09:08:21.189Z",
+            "excerpt": "Looks like the flake comes from the cache warm-up; the second run passes. I'd move the warm-up into the fixture so it's deterministic — see `ee/clickhouse/test/conftest.py:44`.",
+            "latencyHours": 1.72
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33209#discussion_r2172176059",
+            "itemNumber": 33209,
+            "itemTitle": "fix(billing): handle zero-usage invoices",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-06-22T14:14:14.939Z",
+            "excerpt": "This will work, but since `toStartOfWeek` defaults to Sunday in ClickHouse and our UI assumes Monday, the first bucket is short by a day. Suggest:\n```suggestion\ntoStartOfWeek(timestamp, 1)\n```\nThat matches the trends query (#30122).",
+            "quality": 0.66
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33067#discussion_r2138651605",
+            "itemNumber": 33067,
+            "itemTitle": "feat(surveys): allow multiple choice with 'other'",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-05T03:06:59.569Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 0.53
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31102#issuecomment-3205947934",
+            "itemNumber": 31102,
+            "itemTitle": "fix(session-replay): recover from missing snapshot chunks",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-28T04:08:22.619Z",
+            "excerpt": "The root cause is that `person_id` is resolved after the override table is read, so overrides written in the same batch are missed. Two options: (1) read overrides in the same transaction, (2) re-order the steps. I'd suggest (2) because it avoids a lock — see `plugin-server/src/worker/ingestion/person-state.ts:210`. What do you think?",
+            "quality": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "login": "night-nico",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-night-nico?v=4",
+      "association": "CONTRIBUTOR",
+      "eligible": true,
+      "raw": {
+        "responses": 274,
+        "distinctItems": 148,
+        "distinctCounterparts": 84,
+        "medianReplyLatencyHours": 7.9,
+        "latencyN": 164,
+        "within24hPct": 83,
+        "medianFollowThroughHours": 81.7,
+        "followThroughN": 41,
+        "meanQuality": 0.65,
+        "substantiveResponses": 186,
+        "prsAuthored": 38
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 49.6,
+          "rank": 12,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 46,
+              "raw": 7.9,
+              "rawLabel": "Median reply 7.9h",
+              "explanation": "faster than 46% of eligible peers",
+              "n": 164,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 71,
+              "raw": 274,
+              "rawLabel": "274 responses across 148 PRs and issues",
+              "explanation": "more responses than 71% of eligible peers",
+              "n": 274,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 14,
+              "raw": 81.7,
+              "rawLabel": "Last comment lands median 3.4d before merge",
+              "explanation": "PRs merge sooner after their last comment than for 14% of peers",
+              "n": 41,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 90,
+          "rank": 1,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 94,
+              "raw": 0.65,
+              "rawLabel": "Mean comment quality 0.65 of 1.00",
+              "explanation": "more actionable comments than 94% of eligible peers",
+              "n": 274,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 88,
+              "raw": 5.23,
+              "rawLabel": "186 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 88% of eligible peers",
+              "n": 186,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 83,
+              "raw": 84,
+              "rawLabel": "Helped 84 distinct people",
+              "explanation": "reached more people than 83% of eligible peers",
+              "n": 84,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31116#pullrequestreview-3159561244",
+            "itemNumber": 31116,
+            "itemTitle": "feat(insights): add funnel step breakdown by cohort",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-07-10T16:16:56.628Z",
+            "excerpt": "Looks like the flake comes from the cache warm-up; the second run passes. I'd move the warm-up into the fixture so it's deterministic — see `ee/clickhouse/test/conftest.py:44`.",
+            "latencyHours": 0.7
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/31178#issuecomment-3289219752",
+            "itemNumber": 31178,
+            "itemTitle": "Dashboard export ignores date range override",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-27T17:56:42.207Z",
+            "excerpt": "I tried this locally with the demo data and the funnel step counts match the old query within 0.1%. Let's ship it, and I'll watch the CH query log for regressions.",
+            "latencyHours": 3.73
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/32844#issuecomment-3282410858",
+            "itemNumber": 32844,
+            "itemTitle": "HogQL: LEFT JOIN on persons drops rows with null distinct_id",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-10T00:41:26.399Z",
+            "excerpt": "The migration is fine but it runs on a 2B-row table; should we add `ALTER TABLE ... SETTINGS mutations_sync=0` and backfill async? Otherwise deploy blocks for ~40m.",
+            "latencyHours": 5.85
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31735#issuecomment-3275817034",
+            "itemNumber": 31735,
+            "itemTitle": "feat(hog): add array_distinct stdlib function",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-12T18:15:10.026Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 1
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31656#discussion_r2184602113",
+            "itemNumber": 31656,
+            "itemTitle": "fix(ingestion): dedupe events with identical uuid across partitions",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-06T09:25:17.559Z",
+            "excerpt": "This will work, but since `toStartOfWeek` defaults to Sunday in ClickHouse and our UI assumes Monday, the first bucket is short by a day. Suggest:\n```suggestion\ntoStartOfWeek(timestamp, 1)\n```\nThat matches the trends query (#30122).",
+            "quality": 0.9
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31045#issuecomment-3278334803",
+            "itemNumber": 31045,
+            "itemTitle": "chore(ci): split e2e jobs by product area",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-06-25T08:17:10.306Z",
+            "excerpt": "Tried this with the `demo` org: the survey renders but the 'other' free-text answer is dropped by `surveyResponseSchema`. You'll want to add `other_text` to the schema at `surveys/schema.ts:31`, and then the export needs a column for it too.",
+            "quality": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "login": "fast-finn",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-fast-finn?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 164,
+        "distinctItems": 67,
+        "distinctCounterparts": 36,
+        "medianReplyLatencyHours": 14.3,
+        "latencyN": 103,
+        "within24hPct": 68,
+        "medianFollowThroughHours": 43,
+        "followThroughN": 73,
+        "meanQuality": 0.64,
+        "substantiveResponses": 98,
+        "prsAuthored": 13
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 32.8,
+          "rank": 19,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 33,
+              "raw": 14.3,
+              "rawLabel": "Median reply 14.3h",
+              "explanation": "faster than 33% of eligible peers",
+              "n": 103,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 33,
+              "raw": 164,
+              "rawLabel": "164 responses across 67 PRs and issues",
+              "explanation": "more responses than 33% of eligible peers",
+              "n": 164,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 32,
+              "raw": 43,
+              "rawLabel": "Last comment lands median 43h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 32% of peers",
+              "n": 73,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 66.9,
+          "rank": 8,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 85,
+              "raw": 0.64,
+              "rawLabel": "Mean comment quality 0.64 of 1.00",
+              "explanation": "more actionable comments than 85% of eligible peers",
+              "n": 164,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 58,
+              "raw": 4.6,
+              "rawLabel": "98 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 58% of eligible peers",
+              "n": 98,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 35,
+              "raw": 36,
+              "rawLabel": "Helped 36 distinct people",
+              "explanation": "reached more people than 35% of eligible peers",
+              "n": 36,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31945#pullrequestreview-3157293794",
+            "itemNumber": 31945,
+            "itemTitle": "perf(clickhouse): batch person lookups in trends query",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-08-21T07:24:49.372Z",
+            "excerpt": "The failing case is when `rollout_percentage` is 0 and the user is anonymous. Could we early-return false there instead of hashing? Otherwise this leads to a division in `_get_hash`.",
+            "latencyHours": 0.78
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/issues/33373#issuecomment-3200109900",
+            "itemNumber": 33373,
+            "itemTitle": "Session replay player freezes on tab switch",
+            "itemKind": "issue",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-25T01:15:34.254Z",
+            "excerpt": "done — moved the cursor param into the serializer and added a test. Thanks for the pointer to the persons endpoint!",
+            "latencyHours": 7.9
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32796#issuecomment-3247963087",
+            "itemNumber": 32796,
+            "itemTitle": "feat(notebooks): embed recordings inline",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-08T19:36:27.285Z",
+            "excerpt": "Looks like the flake comes from the cache warm-up; the second run passes. I'd move the warm-up into the fixture so it's deterministic — see `ee/clickhouse/test/conftest.py:44`.",
+            "latencyHours": 10.38
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30744#discussion_r2187825665",
+            "itemNumber": 30744,
+            "itemTitle": "fix(feature-flags): respect rollout percentage for anonymous users",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-14T15:22:20.378Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 0.98
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32375#issuecomment-3278735702",
+            "itemNumber": 32375,
+            "itemTitle": "feat(notebooks): embed recordings inline",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-09-01T13:31:53.200Z",
+            "excerpt": "This will work, but since `toStartOfWeek` defaults to Sunday in ClickHouse and our UI assumes Monday, the first bucket is short by a day. Suggest:\n```suggestion\ntoStartOfWeek(timestamp, 1)\n```\nThat matches the trends query (#30122).",
+            "quality": 0.93
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31430#discussion_r2185873284",
+            "itemNumber": 31430,
+            "itemTitle": "feat(surveys): allow multiple choice with 'other'",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-09-06T19:30:24.842Z",
+            "excerpt": "This will work, but since `toStartOfWeek` defaults to Sunday in ClickHouse and our UI assumes Monday, the first bucket is short by a day. Suggest:\n```suggestion\ntoStartOfWeek(timestamp, 1)\n```\nThat matches the trends query (#30122).",
+            "quality": 0.82
+          }
+        ]
+      }
+    },
+    {
+      "login": "thread-theo",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-thread-theo?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 30,
+        "distinctItems": 18,
+        "distinctCounterparts": 6,
+        "medianReplyLatencyHours": 15.5,
+        "latencyN": 19,
+        "within24hPct": 72,
+        "medianFollowThroughHours": 84.4,
+        "followThroughN": 49,
+        "meanQuality": 0.58,
+        "substantiveResponses": 17,
+        "prsAuthored": 32
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 14.2,
+          "rank": 25,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 29,
+              "raw": 15.5,
+              "rawLabel": "Median reply 15.5h",
+              "explanation": "faster than 29% of eligible peers",
+              "n": 19,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 4,
+              "raw": 30,
+              "rawLabel": "30 responses across 18 PRs and issues",
+              "explanation": "more responses than 4% of eligible peers",
+              "n": 30,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 5,
+              "raw": 84.4,
+              "rawLabel": "Last comment lands median 3.5d before merge",
+              "explanation": "PRs merge sooner after their last comment than for 5% of peers",
+              "n": 49,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 40.7,
+          "rank": 18,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 75,
+              "raw": 0.58,
+              "rawLabel": "Mean comment quality 0.58 of 1.00",
+              "explanation": "more actionable comments than 75% of eligible peers",
+              "n": 30,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 8,
+              "raw": 2.89,
+              "rawLabel": "17 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 8% of eligible peers",
+              "n": 17,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 4,
+              "raw": 6,
+              "rawLabel": "Helped 6 distinct people",
+              "explanation": "reached more people than 4% of eligible peers",
+              "n": 6,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31241#issuecomment-3225257927",
+            "itemNumber": 31241,
+            "itemTitle": "chore(deps): bump kea to 3.2",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-08-07T01:13:27.625Z",
+            "excerpt": "I tried this locally with the demo data and the funnel step counts match the old query within 0.1%. Let's ship it, and I'll watch the CH query log for regressions.",
+            "latencyHours": 2.04
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33839#pullrequestreview-3106134548",
+            "itemNumber": 33839,
+            "itemTitle": "fix(feature-flags): respect rollout percentage for anonymous users",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-08-23T21:03:00.123Z",
+            "excerpt": "Could you add a test for the zero-usage invoice? We had a similar bug in #29904 and the fix regressed once already.",
+            "latencyHours": 2.84
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31678#pullrequestreview-3167836414",
+            "itemNumber": 31678,
+            "itemTitle": "feat(hog): add array_distinct stdlib function",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-09-09T15:19:00.950Z",
+            "excerpt": "done — moved the cursor param into the serializer and added a test. Thanks for the pointer to the persons endpoint!",
+            "latencyHours": 3.63
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31837#issuecomment-3262046346",
+            "itemNumber": 31837,
+            "itemTitle": "refactor(frontend): move toolbar to lemon components",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-06-22T12:00:24.703Z",
+            "excerpt": "The root cause is that `person_id` is resolved after the override table is read, so overrides written in the same batch are missed. Two options: (1) read overrides in the same transaction, (2) re-order the steps. I'd suggest (2) because it avoids a lock — see `plugin-server/src/worker/ingestion/person-state.ts:210`. What do you think?",
+            "quality": 0.83
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31387#discussion_r2146015405",
+            "itemNumber": 31387,
+            "itemTitle": "refactor(frontend): move toolbar to lemon components",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-08T09:16:50.060Z",
+            "excerpt": "The root cause is that `person_id` is resolved after the override table is read, so overrides written in the same batch are missed. Two options: (1) read overrides in the same transaction, (2) re-order the steps. I'd suggest (2) because it avoids a lock — see `plugin-server/src/worker/ingestion/person-state.ts:210`. What do you think?",
+            "quality": 0.8
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30739#discussion_r2132315755",
+            "itemNumber": 30739,
+            "itemTitle": "feat(notebooks): embed recordings inline",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-10T21:24:16.014Z",
+            "excerpt": "Tried this with the `demo` org: the survey renders but the 'other' free-text answer is dropped by `surveyResponseSchema`. You'll want to add `other_text` to the schema at `surveys/schema.ts:31`, and then the export needs a column for it too.",
+            "quality": 0.72
+          }
+        ]
+      }
+    },
+    {
+      "login": "wrap-wren",
+      "avatarUrl": "https://avatars.githubusercontent.com/fixture-wrap-wren?v=4",
+      "association": "MEMBER",
+      "eligible": true,
+      "raw": {
+        "responses": 176,
+        "distinctItems": 88,
+        "distinctCounterparts": 53,
+        "medianReplyLatencyHours": 9.5,
+        "latencyN": 142,
+        "within24hPct": 78,
+        "medianFollowThroughHours": 2.2,
+        "followThroughN": 17,
+        "meanQuality": 0.47,
+        "substantiveResponses": 72,
+        "prsAuthored": 42
+      },
+      "algorithms": {
+        "responsive": {
+          "composite": 50.8,
+          "rank": 11,
+          "factors": [
+            {
+              "key": "responsiveness",
+              "label": "Responsiveness",
+              "weight": 0.4,
+              "percentile": 42,
+              "raw": 9.5,
+              "rawLabel": "Median reply 9.5h",
+              "explanation": "faster than 42% of eligible peers",
+              "n": 142,
+              "direction": "lower_is_better"
+            },
+            {
+              "key": "volume",
+              "label": "Volume",
+              "weight": 0.4,
+              "percentile": 42,
+              "raw": 176,
+              "rawLabel": "176 responses across 88 PRs and issues",
+              "explanation": "more responses than 42% of eligible peers",
+              "n": 176,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "followThrough",
+              "label": "Merge follow-through",
+              "weight": 0.2,
+              "percentile": 86,
+              "raw": 2.2,
+              "rawLabel": "Last comment lands median 2.2h before merge",
+              "explanation": "PRs merge sooner after their last comment than for 86% of peers",
+              "n": 17,
+              "direction": "lower_is_better"
+            }
+          ]
+        },
+        "constructive": {
+          "composite": 53.6,
+          "rank": 10,
+          "factors": [
+            {
+              "key": "quality",
+              "label": "Comment quality",
+              "weight": 0.5,
+              "percentile": 58,
+              "raw": 0.47,
+              "rawLabel": "Mean comment quality 0.47 of 1.00",
+              "explanation": "more actionable comments than 58% of eligible peers",
+              "n": 176,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "substantiveVolume",
+              "label": "Substantive volume",
+              "weight": 0.3,
+              "percentile": 46,
+              "raw": 4.29,
+              "rawLabel": "72 substantive responses (quality ≥ 0.4)",
+              "explanation": "more substantive responses than 46% of eligible peers",
+              "n": 72,
+              "direction": "higher_is_better"
+            },
+            {
+              "key": "breadth",
+              "label": "Breadth",
+              "weight": 0.2,
+              "percentile": 54,
+              "raw": 53,
+              "rawLabel": "Helped 53 distinct people",
+              "explanation": "reached more people than 54% of eligible peers",
+              "n": 53,
+              "direction": "higher_is_better"
+            }
+          ]
+        }
+      },
+      "evidence": {
+        "fastestReplies": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/30732#pullrequestreview-3133912111",
+            "itemNumber": 30732,
+            "itemTitle": "perf(clickhouse): batch person lookups in trends query",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-09-09T11:45:12.731Z",
+            "excerpt": "The failing case is when `rollout_percentage` is 0 and the user is anonymous. Could we early-return false there instead of hashing? Otherwise this leads to a division in `_get_hash`.",
+            "latencyHours": 2.69
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32985#issuecomment-3256961576",
+            "itemNumber": 32985,
+            "itemTitle": "feat(insights): add funnel step breakdown by cohort",
+            "itemKind": "pr",
+            "eventKind": "issue_comment",
+            "createdAt": "2026-07-11T03:52:14.705Z",
+            "excerpt": "Looks like the flake comes from the cache warm-up; the second run passes. I'd move the warm-up into the fixture so it's deterministic — see `ee/clickhouse/test/conftest.py:44`.",
+            "latencyHours": 4.08
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/32604#pullrequestreview-3103021804",
+            "itemNumber": 32604,
+            "itemTitle": "fix(dashboards): tile refresh race when filters change",
+            "itemKind": "pr",
+            "eventKind": "review",
+            "createdAt": "2026-08-29T16:14:55.141Z",
+            "excerpt": "What happens if `snapshot_chunks` is empty? I think we'd throw on line 112 — consider guarding and emitting a `replay_missing_chunk` event so we can measure it.",
+            "latencyHours": 4.57
+          }
+        ],
+        "bestComments": [
+          {
+            "url": "https://github.com/PostHog/posthog/pull/33230#discussion_r2158641658",
+            "itemNumber": 33230,
+            "itemTitle": "feat(surveys): allow multiple choice with 'other'",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-07-11T02:14:18.788Z",
+            "excerpt": "Nice — one thing: the `useEffect` runs on every filter change, so the tile refetches twice when both the date and breakdown change together. Consider debouncing via `useDebouncedCallback` from `lib/hooks`; we did the same in `trendsDataLogic` and it removed the double query.",
+            "quality": 0.76
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31373#discussion_r2188560182",
+            "itemNumber": 31373,
+            "itemTitle": "feat(data-warehouse): support Postgres source schemas",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-25T23:34:55.299Z",
+            "excerpt": "What if we compute the credible interval in the backend instead of the frontend? The Bayesian code already exists in `experiments/stats.py`, and that way the API and the export agree. I can push a draft if you'd like.",
+            "quality": 0.65
+          },
+          {
+            "url": "https://github.com/PostHog/posthog/pull/31980#discussion_r2145245676",
+            "itemNumber": 31980,
+            "itemTitle": "feat(data-warehouse): support Postgres source schemas",
+            "itemKind": "pr",
+            "eventKind": "review_comment",
+            "createdAt": "2026-08-14T19:06:44.139Z",
+            "excerpt": "Nice — one thing: the `useEffect` runs on every filter change, so the tile refetches twice when both the date and breakdown change together. Consider debouncing via `useDebouncedCallback` from `lib/hooks`; we did the same in `trendsDataLogic` and it removed the double query.",
+            "quality": 0.65
+          }
+        ]
+      }
+    }
+  ]
+}
