@@ -124,13 +124,20 @@ async function loadFromDb(): Promise<{ items: ItemRow[]; events: EventRow[]; met
 
 async function persist(data: DashboardData, all: EngineerScore[], meta: IngestMeta): Promise<number> {
   const sql = getSql();
-  let [run] = await sql`select id from ingest_runs order by id desc limit 1`;
-  if (!run) {
+  let [run] = await sql`select id, window_start, window_end from ingest_runs order by id desc limit 1`;
+  // Reuse the latest run only when it describes the same window as the data
+  // being scored; otherwise (no run yet, or a stale smoke run) create one.
+  const sameWindow =
+    run &&
+    Math.abs(Date.parse(iso(run.window_start)) - Date.parse(meta.windowStart)) < 60_000 &&
+    Math.abs(Date.parse(iso(run.window_end)) - Date.parse(meta.windowEnd)) < 60_000;
+  if (!run || !sameWindow) {
+    if (run) console.log(`Latest ingest_runs row ${run.id} covers a different window; creating a new one`);
     [run] = await sql`
       insert into ingest_runs (started_at, finished_at, window_start, window_end, counts)
       values (${meta.fetchedAt}, ${meta.fetchedAt}, ${meta.windowStart}, ${meta.windowEnd},
               ${sql.json({ ...meta.counts, botLoginsSeen: meta.botLoginsSeen } as never)})
-      returning id`;
+      returning id, window_start, window_end`;
     console.log(`Created ingest_runs row ${run.id} from meta`);
   }
   const runId = Number(run.id);

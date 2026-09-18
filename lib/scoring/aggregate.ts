@@ -354,21 +354,33 @@ export function assignRanks(
 // Evidence
 // ---------------------------------------------------------------------------
 
+// Lone UTF-16 surrogates (e.g. from a truncated emoji) are invalid JSON for
+// Postgres, so every string that reaches the payload is scrubbed.
+const LONE_SURROGATE_RE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+export function safeText(s: string): string {
+  return (s ?? "").replace(LONE_SURROGATE_RE, "");
+}
+
 export function excerpt(body: string, event?: EventRow): string {
-  const collapsed = (body ?? "").replace(/\s+/g, " ").trim();
+  const collapsed = safeText(body).replace(/\s+/g, " ").trim();
   if (collapsed.length === 0 && event?.kind === "review") {
     const state = (event.reviewState ?? "").toLowerCase().replace(/_/g, " ");
     return state ? `(${state} without a comment)` : "";
   }
   if (collapsed.length <= EXCERPT_CHARS) return collapsed;
-  return collapsed.slice(0, EXCERPT_CHARS - 1).trimEnd() + "…";
+  // Slice by code point so a surrogate pair is never split, then re-check
+  // the UTF-16 length that EXCERPT_CHARS is expressed in.
+  let cut = Array.from(collapsed).slice(0, EXCERPT_CHARS - 1).join("");
+  while (cut.length > EXCERPT_CHARS - 1) cut = Array.from(cut).slice(0, -1).join("");
+  return cut.trimEnd() + "…";
 }
 
 function toEvidence(r: ScoredResponse): EvidenceItem {
   return {
     url: r.event.url,
     itemNumber: r.item.number,
-    itemTitle: r.item.title,
+    itemTitle: safeText(r.item.title),
     itemKind: r.item.kind,
     eventKind: r.event.kind,
     createdAt: r.event.createdAt,

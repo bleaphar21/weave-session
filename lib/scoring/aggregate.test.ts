@@ -117,6 +117,15 @@ describe("excerpt", () => {
     expect(e.endsWith("…")).toBe(true);
     expect(excerpt("a\n\n  b\tc")).toBe("a b c");
   });
+  it("never splits a surrogate pair or emits a lone surrogate", () => {
+    const body = "x".repeat(EXCERPT_CHARS - 2) + "🎉🎉🎉 tail";
+    const e = excerpt(body);
+    expect(e.length).toBeLessThanOrEqual(EXCERPT_CHARS);
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(e)).toBe(false);
+    expect(() => JSON.parse(JSON.stringify(e))).not.toThrow();
+    // A body that already contains a lone surrogate is scrubbed.
+    expect(excerpt("bad \uDE00 char")).toBe("bad char");
+  });
   it("describes empty approvals", () => {
     expect(excerpt("", ev({ itemNumber: 1, authorLogin: "x", createdAt: h(1), kind: "review", reviewState: "APPROVED", body: "" }))).toContain("approved");
   });
