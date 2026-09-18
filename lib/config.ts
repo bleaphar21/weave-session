@@ -45,6 +45,23 @@ export function isBotLogin(login: string, userType?: string | null): boolean {
   return (BOT_LOGIN_DENYLIST as readonly string[]).includes(l);
 }
 
+/**
+ * Comments posted through a human's account but self-declared as automated
+ * (PostHog runs agent tooling such as "QA Swarm", "Review Triage" and
+ * "PR Shepherd" under personal logins). Matched case-insensitively against
+ * the comment body; matching events are excluded like bot events.
+ */
+export const AUTOMATED_BODY_MARKERS: readonly RegExp[] = [
+  /not written by a human/i,
+  /automated comment by/i,
+  /^\s*(?:>\s*)?AI reply:/i,
+];
+
+export function isAutomatedBody(body: string | null | undefined): boolean {
+  if (!body) return false;
+  return AUTOMATED_BODY_MARKERS.some((re) => re.test(body));
+}
+
 export const ELIGIBILITY = {
   minResponses: 20,
   minDistinctItems: 10,

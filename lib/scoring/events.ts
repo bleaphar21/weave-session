@@ -6,7 +6,7 @@
  * Pure functions; no I/O.
  */
 
-import { isBotLogin, LATENCY_CAP_HOURS } from "../config";
+import { isAutomatedBody, isBotLogin, LATENCY_CAP_HOURS } from "../config";
 import type { EventRow, ItemRow } from "../types";
 
 export const HOUR_MS = 3_600_000;
@@ -44,6 +44,7 @@ export interface FollowThroughRecord {
  */
 export function isResponseEvent(e: EventRow): boolean {
   if (isBotLogin(e.authorLogin)) return false;
+  if (isAutomatedBody(e.body)) return false;
   if (e.kind !== "review") return true;
   const state = (e.reviewState ?? "").toUpperCase();
   if (state === "APPROVED" || state === "CHANGES_REQUESTED" || state === "DISMISSED") return true;

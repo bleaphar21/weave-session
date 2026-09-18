@@ -17,6 +17,13 @@ describe("isResponseEvent", () => {
     expect(isResponseEvent(ev({ itemNumber: 1, authorLogin: "posthog-bot", createdAt: h(1) }))).toBe(false);
     expect(isResponseEvent(ev({ itemNumber: 1, authorLogin: "greptile-apps[bot]", createdAt: h(1) }))).toBe(false);
   });
+
+  it("drops self-declared automated comments posted under human logins", () => {
+    const marker = "> [!NOTE]\n> 🤖 Automated comment by **QA Swarm** — not written by a human\n\nFindings...";
+    expect(isResponseEvent(ev({ itemNumber: 1, authorLogin: "a", createdAt: h(1), body: marker }))).toBe(false);
+    expect(isResponseEvent(ev({ itemNumber: 1, authorLogin: "a", createdAt: h(1), body: "AI reply: Fixed in abc123." }))).toBe(false);
+    expect(isResponseEvent(ev({ itemNumber: 1, authorLogin: "a", createdAt: h(1), body: "I asked the AI to reply here, but this is me." }))).toBe(true);
+  });
 });
 
 describe("groupEventsByItem", () => {

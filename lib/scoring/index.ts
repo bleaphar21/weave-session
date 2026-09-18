@@ -3,7 +3,7 @@
  * DashboardData payload the page renders.
  */
 
-import { isBotLogin } from "../config";
+import { isAutomatedBody, isBotLogin } from "../config";
 import type { DashboardData, EngineerScore, EventRow, ItemRow } from "../types";
 import { scoreEngineers } from "./aggregate";
 import { buildMethodology } from "./methodology";
@@ -50,6 +50,8 @@ export function dropBots(items: ItemRow[], events: EventRow[]): { items: ItemRow
       botLogins.add(e.authorLogin);
       return false;
     }
+    // Self-declared automated comments posted through a human's account.
+    if (isAutomatedBody(e.body)) return false;
     return true;
   });
   // Items authored by bots stay (humans respond on them) but we still record the login.

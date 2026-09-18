@@ -21,6 +21,7 @@ const SHARED_DEFINITIONS: string[] = [
   `Reply latency: t minus the trigger time, capped at ${LATENCY_CAP_HOURS / 24} days. Excluded when the immediately previous human event on the item is by the same person (a follow-up, not a reply), when the item predates the window and no in-window trigger exists, or when the trigger is the creation of a draft PR. Volume still counts these.`,
   "An author's comment on their own PR or issue counts as a response only when it replies to another human who has already commented.",
   `Human: GitHub user type is User and the login is not on the bot denylist (matches [bot], ends in "bot", or is one of: ${BOT_LOGIN_DENYLIST.join(", ")}).`,
+  'Automated comments posted through a human account are excluded too: any comment whose body says "not written by a human" or "Automated comment by …" (PostHog\'s QA Swarm, Review Triage and PR Shepherd agents) or starts with "AI reply:". They are dropped from volume, latency and quality alike.',
   `Window: ${WINDOW_DAYS} days ending at ingest time. Items are included if created or updated in the window; only events created in the window are stored.`,
   "External contributors are included and labeled with their author association (MEMBER, CONTRIBUTOR, etc.). PRs authored are shown as context only and are not part of either score.",
 ];
